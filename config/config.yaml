@@ -34,24 +34,21 @@ disagreement:
 
 models:
   text_model:
-    type: distilbert
-    pretrained_name: distilbert-base-uncased
-    max_length: 256
-    epochs: 2
-    batch_size: 16
-    learning_rate: 0.00002
+    type: tfidf
+    max_features: 20000
+    ngram_range: [1, 2]
 
   metadata_model:
     type: xgboost
 
   multimodal_model:
-    text_encoder: distilbert-base-uncased
-    freeze_text_encoder: true
+    type: tfidf_meta_mlp
+    text_max_features: 20000
     hidden_dims: [256, 64]
     dropout: 0.2
-    epochs: 5
-    batch_size: 32
-    learning_rate: 0.0001
+    epochs: 15
+    batch_size: 64
+    learning_rate: 0.001
 
 evaluation:
   high_confidence_threshold: 0.90
