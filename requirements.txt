@@ -1,0 +1,14 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+tqdm
+pyyaml
+datasets
+transformers
+torch
+accelerate
+xgboost
+sentence-transformers
+evaluate

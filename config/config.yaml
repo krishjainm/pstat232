@@ -1,0 +1,58 @@
+project:
+  name: pstat262ds_multimodal_disagreement
+  seed: 42
+
+data:
+  dataset_name: McAuley-Lab/Amazon-Reviews-2023
+  category: All_Beauty
+  max_samples: 50000
+  positive_threshold: 4
+  negative_threshold: 2
+  drop_neutral: true
+
+splits:
+  train_size: 0.70
+  val_size: 0.15
+  test_size: 0.15
+
+features:
+  text_column: text
+  rating_column: rating
+  metadata_features:
+    - review_length_words
+    - review_length_chars
+    - helpful_vote
+    - verified_purchase
+    - product_average_rating
+    - product_rating_number
+    - review_year
+
+disagreement:
+  weak_threshold: 0.70
+  medium_threshold: 0.90
+  strong_threshold: 0.90
+
+models:
+  text_model:
+    type: distilbert
+    pretrained_name: distilbert-base-uncased
+    max_length: 256
+    epochs: 2
+    batch_size: 16
+    learning_rate: 0.00002
+
+  metadata_model:
+    type: xgboost
+
+  multimodal_model:
+    text_encoder: distilbert-base-uncased
+    freeze_text_encoder: true
+    hidden_dims: [256, 64]
+    dropout: 0.2
+    epochs: 5
+    batch_size: 32
+    learning_rate: 0.0001
+
+evaluation:
+  high_confidence_threshold: 0.90
+  n_bins_calibration: 10
