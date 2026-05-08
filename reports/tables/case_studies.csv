@@ -1,0 +1,6 @@
+text_preview,true_label,mm_prediction,mm_confidence,text_pred,meta_pred,agreement_status,disagreement_group,error_type
+Nice and comfy,negative,positive,0.9998698234558105,positive,positive,disagreement,strong_disagreement,short_review
+The zipper is broken can not use them waste of money and not use and can not return that is not right,positive,negative,0.9996210336685181,negative,negative,disagreement,strong_disagreement,other
+Stone was missing.,positive,negative,0.9988405108451843,negative,negative,disagreement,strong_disagreement,short_review
+"I bought a Camera for $145.98 LESS $36.93 gift card which came to $109.05 but was charged full price, $145.98 ....I would like to know WHY !!!!! .........Richard Giller....112 Harbor Dr. #212 Runaway Bay, Texas 76426......rgiller38@gmail.com.... Phone 361 463 9202.",positive,negative,0.9984731078147888,negative,negative,disagreement,strong_disagreement,mixed_sentiment
+"Didn't give it four stars for a couple of reasons. First the brush is a little stiff compared to the brush I had. Second and this has only happened once so far, the head fell off the handle just hanging in the shower.",positive,negative,0.9821019172668457,negative,positive,disagreement,strong_disagreement,comparative

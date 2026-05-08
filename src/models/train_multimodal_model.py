@@ -90,15 +90,18 @@ class GatedFusionModel(nn.Module):
 
 
 class FusionDataset(Dataset):
-    def __init__(self, features, labels):
+    def __init__(self, features, labels, weights=None):
         self.features = torch.tensor(features, dtype=torch.float32)
         self.labels = torch.tensor(labels, dtype=torch.long)
+        self.weights = torch.tensor(weights, dtype=torch.float32) if weights is not None else None
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        return self.features[idx], self.labels[idx]
+        if self.weights is not None:
+            return self.features[idx], self.labels[idx], self.weights[idx]
+        return self.features[idx], self.labels[idx], torch.tensor(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +175,19 @@ def _build_model(fusion_type, input_dim, text_dim, meta_dim, mm_cfg):
 # Training
 # ---------------------------------------------------------------------------
 
-def train_multimodal(train_df, val_df, cfg, save_dir="models/multimodal"):
+def _compute_sample_weights(train_df, disagree_weight=3.0):
+    """Assign higher loss weights to disagreement samples."""
+    weights = np.ones(len(train_df), dtype=np.float32)
+    if "agreement_status" in train_df.columns:
+        disagree_mask = train_df["agreement_status"].values == "disagreement"
+        weights[disagree_mask] = disagree_weight
+        n_d = disagree_mask.sum()
+        print(f"Disagreement-aware weighting: {n_d} disagreement samples weighted {disagree_weight}x")
+    return weights
+
+
+def train_multimodal(train_df, val_df, cfg, save_dir="models/multimodal",
+                     disagree_aware=False, disagree_weight=3.0):
     os.makedirs(save_dir, exist_ok=True)
     mm_cfg = cfg["models"]["multimodal_model"]
     seed = cfg["project"]["seed"]
@@ -181,7 +196,10 @@ def train_multimodal(train_df, val_df, cfg, save_dir="models/multimodal"):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     fusion_type = mm_cfg.get("fusion_type", "early")
-    print(f"Training multimodal model on {device} (fusion={fusion_type})")
+    mode_str = f"fusion={fusion_type}"
+    if disagree_aware:
+        mode_str += f", disagree_weight={disagree_weight}"
+    print(f"Training multimodal model on {device} ({mode_str})")
 
     # Text features
     X_train_text = _get_text_features(train_df, cfg, save_dir, is_train=True)
@@ -208,7 +226,8 @@ def train_multimodal(train_df, val_df, cfg, save_dir="models/multimodal"):
 
     print(f"Combined feature dim: {X_train.shape[1]} (text={text_dim}, meta={meta_dim})")
 
-    train_ds = FusionDataset(X_train, y_train)
+    sample_weights = _compute_sample_weights(train_df, disagree_weight) if disagree_aware else None
+    train_ds = FusionDataset(X_train, y_train, weights=sample_weights)
     val_ds = FusionDataset(X_val, y_val)
     train_loader = DataLoader(train_ds, batch_size=mm_cfg["batch_size"], shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=mm_cfg["batch_size"])
@@ -216,20 +235,22 @@ def train_multimodal(train_df, val_df, cfg, save_dir="models/multimodal"):
     input_dim = X_train.shape[1]
     model = _build_model(fusion_type, input_dim, text_dim, meta_dim, mm_cfg).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=mm_cfg["learning_rate"])
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(reduction="none")
 
     best_val_acc = 0
     for epoch in range(mm_cfg["epochs"]):
         model.train()
         total_loss = 0
-        for X_batch, y_batch in train_loader:
+        for X_batch, y_batch, w_batch in train_loader:
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+            w_batch = w_batch.to(device)
             optimizer.zero_grad()
             if fusion_type in ("late", "gated"):
                 logits = model(X_batch, text_dim=text_dim)
             else:
                 logits = model(X_batch)
-            loss = criterion(logits, y_batch)
+            per_sample_loss = criterion(logits, y_batch)
+            loss = (per_sample_loss * w_batch).mean()
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
@@ -239,7 +260,7 @@ def train_multimodal(train_df, val_df, cfg, save_dir="models/multimodal"):
         model.eval()
         val_preds = []
         with torch.no_grad():
-            for X_batch, y_batch in val_loader:
+            for X_batch, y_batch, _ in val_loader:
                 if fusion_type in ("late", "gated"):
                     logits = model(X_batch.to(device), text_dim=text_dim)
                 else:
@@ -310,7 +331,8 @@ def predict_multimodal(df, split_name, cfg, save_dir="models/multimodal"):
 
     all_preds, all_probs = [], []
     with torch.no_grad():
-        for X_batch, _ in loader:
+        for batch in loader:
+            X_batch = batch[0]
             if fusion_type in ("late", "gated"):
                 logits = model(X_batch.to(device), text_dim=text_dim)
             else:

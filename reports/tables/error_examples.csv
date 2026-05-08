@@ -1,21 +1,21 @@
 review_text,rating,label,text_sentiment_label,text_pred,meta_pred,mm_pred,mm_confidence,disagreement_group
-"Love this product! It makes my curls soft, moist, and easy to manage. I get complements about my curls when I use it.<br /><br />But I just realized they only sent me to of the product and one of the products was different.",1.0,0,1,1,1,1,0.9946577,strong_disagreement
-"Not a big fan of this product, my hair has not felt the same since using it. It says it's supposed to make your hair soft and smooth and my hair has just been course and frizzy. The scent is pleasant, like a fresh hair do but I would not suggest it.",2.0,0,1,1,1,1,0.9694073,strong_disagreement
-It’s cute and all but when I opened the package glitter went all over the place because the lid to one of glitter jar was open.... So for the way they packaged the product was a hard fail.,4.0,1,0,0,1,0,0.9146865,strong_disagreement
-Good for The price..,2.0,0,1,1,1,1,0.9879381,strong_disagreement
-"Didn't get these for any aesthetic effect. I sliced my fingernail pretty badly and instead of using bandaids to keep it from splitting more, I bought these and the glue and fake nail seem to be holding my fingernail together pretty well after 3 days.",5.0,1,0,0,1,0,0.93596995,strong_disagreement
-So it is good. the color is great. and it is what it says.... The only bad thang is it taste like a dead anamal. but just like most. ... Ewww,2.0,0,1,1,1,1,0.92578477,strong_disagreement
-"I wanted to believe all the hype, but alas, this was no good for me. It didn't curl my lashes any better than the drugstore model.<br /><br />I have very straight and somewhat sparse lashes -- they do take mascara very well though (too faced better than sex is a great buildable mascara, btw)...if only I could get the lashes to curl up they'd be pretty good all things considered. This curler got my hopes up but not the lashes -- in a side by side comparison my old curler (I think it's a Revlon from CVS) did as good if not a little better. Oh well :(",2.0,0,1,1,1,1,0.9876416,weak_disagreement
-The product is beautiful and realistic but I was a bit upset when I noticed that two pieces had broken off during transit. I would return it for another one but would be afraid I wouldn’t get the replacement back in time for Halloween.,4.0,1,0,0,1,0,0.91661245,strong_disagreement
-"This hair is very beautiful. The only things I did not like are that 1) it seems shorter than the length I ordered and 2) which is the worst part, it completely list all the wave after 1 wash. It looked like straight hair barely even a little junk to it",4.0,1,0,0,1,0,0.9694634,medium_disagreement
-"bought same brand, same color at TJ Maxx for $4.99. Only give two stars because of price, but it is an awesome comfortable product!!",2.0,0,1,1,1,1,0.9798156,strong_disagreement
-"I would have give 5 stars for the quality of use is very good I like it a lot, but not even using it every day it’s out of ink in a week. 😕",2.0,0,1,1,1,1,0.9442651,strong_disagreement
-So I had a broke front tooth on my denture and I’m trying to to take these teeth and mold it to my denture?? I picked these out cuz they looked like my teeth but it’s hard to chisel a tooth into a denture and hold on to tooth and have it come out straight so I hope I get it first,4.0,1,0,0,1,0,0.9308526,strong_disagreement
-Unfortunately it still fogs up. It’s not horrible but after a few weeks I noticed it started to fog up every shower.,4.0,1,0,0,1,0,0.97138613,strong_disagreement
-It was great till I woke up with fresh pimples scattered across my face.,1.0,0,1,1,1,1,0.9235157,strong_disagreement
-"Smaller than I anticipated, but they work. I think if you have a lot of hair, you would need a different shower cap",2.0,0,1,1,1,1,0.9134876,strong_disagreement
-"Love the colors, but not very pigmented.",2.0,0,1,1,1,1,0.9875524,strong_disagreement
-This product is pretty straight forward its a sticky mirror. it does pretty much that. not sure if I miss read the directions or not but definitely get the back wet before your try to stick it to your shower wall. it does stick to tile even if uneven. my only thing is they say it is anti fog and it is for like a week and then something happens and it just isn't anymore and I have no idea why.,5.0,1,0,0,0,0,0.9190864,strong_disagreement
-The plastic is so very frosted that it almost defeats the point.,4.0,1,0,0,0,0,0.9789161,strong_disagreement
-The material seems cheap but light. Seems like it could be easily broken.,4.0,1,0,0,1,0,0.91305053,strong_disagreement
-The hair itself is thick and really good quality. But deff need more than one to look good,2.0,0,1,1,1,1,0.95756847,strong_disagreement
+You have to cut all of the stray straight edges off.,4.0,1,0,0,0,0,0.9896979,strong_disagreement
+I bought 2 instead of one as it is smaller and easier for traveling. I use this product for many years.,5.0,1,0,0,1,0,0.9372714,strong_disagreement
+I wasn't sure what to expect but its like hair dye for your eyebrows. Just be careful not to stain your skin.,4.0,1,0,0,1,0,0.91003114,weak_disagreement
+Hard to used due to size of unit. Not like the little handheld water pic.,4.0,1,0,0,0,0,0.9791637,strong_disagreement
+"started shedding after a few weeks, end would just snap off",4.0,1,0,0,0,0,0.9905212,strong_disagreement
+Stone was missing.,5.0,1,0,0,0,0,0.9988405,strong_disagreement
+They are actually better than expected.<br />I just don’t like how it covers the ears.<br />So I cut out a piece around it.<br />I go between these and a durag,5.0,1,0,0,0,0,0.9143676,strong_disagreement
+"Bought as a gift, no idea. Just want it removed from my items to review list.",5.0,1,0,0,1,0,0.9241132,strong_disagreement
+Great kit if you are willing to wait two months for it.,1.0,0,1,1,1,1,0.9423486,strong_disagreement
+If you like long dramatic lashes you'll like these!,2.0,0,1,1,0,1,0.96041626,strong_disagreement
+"I bought a Camera for $145.98 LESS $36.93 gift card which came to $109.05 but was charged full price, $145.98 ....I would like to know WHY !!!!! .........Richard Giller....112 Harbor Dr. #212 Runaway Bay, Texas 76426......rgiller38@gmail.com.... Phone 361 463 9202.",5.0,1,0,0,0,0,0.9984731,strong_disagreement
+Like the weight of the wrap,5.0,1,0,0,0,0,0.95676506,strong_disagreement
+The best ive every had well be ordering more,1.0,0,1,1,0,1,0.9412773,strong_disagreement
+Love the item but you have to beware to make sure you take the attachment out of the device because it has a tendency to break off inside of the device and it's very hard to get out. I need to order more attachments.,4.0,1,0,0,0,0,0.93424684,strong_disagreement
+"I bought this trimmer in 2009 and have been using it every week since. It is easy to handle and provide a comfortable clean cut. However it is very hard to clean. The trap's hinges broke twice already. This is rechargeable trimmer with a long lasting battery (~8 beard trims) but it is not really a travel trimmer. It charges only on 110v and the on/off switch place atop tends to turn the trimmer on in its traveling bag. I ended up growing a thick holiday beard on few occasion! As for the turbo, I never figured it's use.<br /><br />Bottom line, it is a good value home trimmer to handle delicately.",2.0,0,1,1,1,1,0.96004033,weak_disagreement
+Its okay im a licensed hairstylist for 20 yrs to me its a little thick i had to razor cut alot of hair off the top to get it to lay flat .also the color of the scalp is too dark an orangy. More yellow or pale yellow would have been better for a woman of Color,4.0,1,0,0,1,0,0.95198596,strong_disagreement
+This hair was so soft and lasted 1 month.,5.0,1,0,0,0,0,0.9359883,medium_disagreement
+This is the only eyebrow pencil that covers grey hairs.,5.0,1,0,0,0,0,0.9615286,strong_disagreement
+Senegalese Spring Twist crochet hair is lightweight and looks as pictured. I purchased two packages of six; I wanted to have more so that I was not lacking for the fullness that I wanted to achieve.,4.0,1,0,0,0,0,0.90536726,strong_disagreement
+Two people use this toothbrush and it stays charged for over a week.,5.0,1,0,0,0,0,0.9585941,medium_disagreement

@@ -1,0 +1,9 @@
+feature,importance
+product_average_rating,0.4298956
+verified_purchase,0.10228316
+review_year,0.09329764
+product_rating_number,0.088322766
+helpful_vote,0.074527025
+review_length_chars,0.07330628
+review_length_words,0.071787514
+product_price,0.066579975

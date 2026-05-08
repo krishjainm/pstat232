@@ -1,0 +1,7 @@
+comparison,subset,n,chi2,p_value,significant
+text_only_vs_multimodal,overall,3102,17.561946902654867,2.7809802344291867e-05,True
+text_only_vs_multimodal,disagreement,343,4.654545454545454,0.03097143165084626,True
+metadata_only_vs_multimodal,overall,3102,450.96466809421844,0.0,True
+metadata_only_vs_multimodal,disagreement,343,0.5565217391304348,0.4556650913933439,False
+text_only_vs_metadata_only,overall,3102,311.6803278688525,0.0,True
+text_only_vs_metadata_only,disagreement,343,0.32666666666666666,0.5676284992633358,False
