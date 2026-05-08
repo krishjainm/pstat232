@@ -1,4 +1,4 @@
-"""Tests for disagreement definition."""
+"""Tests for disagreement definition and modality dominance."""
 
 import sys
 sys.path.insert(0, ".")
@@ -24,11 +24,8 @@ def test_assign_disagreement():
     assert result["agreement_status"].iloc[2] == "agreement"
     assert result["agreement_status"].iloc[3] == "disagreement"
 
-    # row 1: disagree, conf=0.60 < 0.70 → weak
     assert result["disagreement_group"].iloc[1] == "weak_disagreement"
-    # row 3: disagree, conf=0.95 >= 0.90 → strong
     assert result["disagreement_group"].iloc[3] == "strong_disagreement"
-    # row 4: disagree, conf=0.80, 0.70 <= 0.80 < 0.90 → medium
     assert result["disagreement_group"].iloc[4] == "medium_disagreement"
 
 
@@ -45,7 +42,58 @@ def test_modality_dominance():
     assert classify_dominance(row_both) == "both_agree"
 
 
+def test_probability_dominance():
+    from src.evaluation.modality_dominance import compute_probability_dominance
+
+    df = pd.DataFrame({
+        "mm_prob_positive": [0.9, 0.2, 0.6, 0.8],
+        "text_prob_positive": [0.85, 0.3, 0.7, 0.1],
+        "meta_prob_positive": [0.5, 0.1, 0.5, 0.9],
+        "agreement_status": ["agreement", "disagreement", "disagreement", "disagreement"],
+    })
+
+    result_df, summary = compute_probability_dominance(df)
+    assert "dominance_ratio" in result_df.columns
+    assert len(result_df) == 4
+    assert 0 <= result_df["dominance_ratio"].min()
+    assert result_df["dominance_ratio"].max() <= 1
+    assert "disagree_mean_ratio" in summary
+
+
+def test_conflict_dominance():
+    from src.evaluation.modality_dominance import compute_conflict_dominance
+
+    df = pd.DataFrame({
+        "text_pred": [1, 0, 1, 0, 1],
+        "meta_pred": [0, 1, 1, 0, 0],
+        "mm_pred":   [1, 0, 1, 0, 0],
+        "label":     [1, 0, 1, 0, 1],
+    })
+
+    results, stats = compute_conflict_dominance(df)
+    assert len(results) == 3
+    assert stats["n_conflict_cases"] == 3  # rows 0, 1, 4 have text != meta
+    assert results["count"].sum() == 3
+
+
+def test_conflict_dominance_no_conflicts():
+    from src.evaluation.modality_dominance import compute_conflict_dominance
+
+    df = pd.DataFrame({
+        "text_pred": [1, 0, 1],
+        "meta_pred": [1, 0, 1],
+        "mm_pred":   [1, 0, 1],
+        "label":     [1, 0, 1],
+    })
+
+    results, stats = compute_conflict_dominance(df)
+    assert len(results) == 0
+
+
 if __name__ == "__main__":
     test_assign_disagreement()
     test_modality_dominance()
+    test_probability_dominance()
+    test_conflict_dominance()
+    test_conflict_dominance_no_conflicts()
     print("All disagreement tests passed.")
