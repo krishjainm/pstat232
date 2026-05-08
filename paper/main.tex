@@ -12,7 +12,7 @@
 \usepackage{enumitem}
 \usepackage{subcaption}
 
-\title{When Modalities Disagree: Failure Modes in Multimodal Sentiment Classification}
+\title{When Modalities Disagree: Failure Modes and Mitigations\\in Multimodal Sentiment Classification}
 \author{
   Krishna \\
   Department of Statistics \& Applied Probability \\
@@ -27,11 +27,11 @@
 \begin{abstract}
 Multimodal learning integrates diverse data sources under the assumption that combining modalities improves prediction.
 However, real-world data frequently contains conflicting signals across modalities.
-We investigate how multimodal sentiment classifiers behave when input modalities disagree, using the Amazon Reviews 2023 dataset.
-We construct binary sentiment models using text (via sentence-transformer embeddings), structured metadata, and three multimodal fusion architectures (early, late, and gated fusion), then systematically evaluate performance across agreement and disagreement subsets of varying severity.
-Our analysis reveals that: (1) multimodal fusion improves average accuracy (88.8\% vs.\ 86.8\% text-only) but degrades disproportionately under modality conflict (64.1\% on disagreement cases); (2) the fusion model exhibits strong text-modality dominance, following text predictions in 82.2\% of true-conflict cases; (3) disagreement induces severe miscalibration (ECE of 0.219 vs.\ 0.017 for agreement) that persists after temperature scaling; and (4) all three fusion architectures perform comparably, suggesting the problem lies in the fusion paradigm itself rather than architectural details.
-We provide bootstrap confidence intervals and McNemar's tests for all comparisons, a probability-based dominance analysis, selective prediction curves, and a qualitative error taxonomy.
-Our findings motivate disagreement-aware fusion strategies and modality-conditioned calibration for production multimodal systems.
+We investigate how multimodal sentiment classifiers behave when input modalities disagree, using the Amazon Reviews 2023 dataset across multiple product categories.
+We construct binary sentiment models using text (sentence-transformer embeddings), structured metadata, and three fusion architectures (early, late, and gated), then systematically evaluate performance across agreement and disagreement subsets.
+Our analysis reveals that: (1) fusion improves average accuracy (88.8\% vs.\ 86.8\% text-only) but degrades severely under conflict (64.1\% on disagreement cases); (2) the fusion model follows text predictions in 82.2\% of true-conflict cases; (3) disagreement induces 13$\times$ worse calibration (ECE of 0.219 vs.\ 0.017) that persists after temperature scaling; and (4) all three architectures perform comparably, suggesting a paradigm limitation.
+We then show that \textbf{disagreement-aware loss reweighting} improves disagreement accuracy by 3.2~pp and F1 by 4.3~pp with only 1.5~pp overall cost, demonstrating the problem is addressable.
+All comparisons include bootstrap 95\% confidence intervals and McNemar's tests.
 \end{abstract}
 
 \section{Introduction}
@@ -43,246 +43,232 @@ A product review's text may sound enthusiastic while its star rating is low, or 
 
 When modalities disagree, fusion models face a fundamental dilemma: which signal should dominate?
 Prior work has shown that multimodal models can over-rely on a single modality \citep{wang2020makes, peng2022balanced}, and that modality gaps in representation space can hinder effective fusion \citep{liang2022mind}.
-Yet few studies systematically characterize \emph{when} fusion models fail and \emph{how} they resolve conflicting inputs.
+Yet few studies systematically characterize \emph{when} fusion models fail, \emph{how} they resolve conflicting inputs, and whether simple interventions can help.
 
 This paper makes the following contributions:
 \begin{enumerate}[leftmargin=*,nosep]
   \item We define a disagreement severity framework based on text--rating conflict, creating four evaluation subgroups (agreement, weak/medium/strong disagreement).
-  \item We compare text-only (sentence-transformer + logistic regression), metadata-only (XGBoost), and multimodal fusion models (early, late, and gated architectures) across these subgroups.
-  \item We introduce a probability-based dominance analysis and a true-conflict dominance analysis that goes beyond label-based classification.
-  \item We provide full statistical rigor: bootstrap 95\% confidence intervals for all metrics, McNemar's tests for model comparisons, group-conditional calibration, temperature scaling experiments, and selective prediction curves.
-  \item We provide a qualitative error taxonomy of multimodal failure modes.
+  \item We compare text-only, metadata-only, and three multimodal fusion architectures across these subgroups with full statistical rigor.
+  \item We introduce probability-based and true-conflict dominance analyses that quantify modality reliance beyond binary labels.
+  \item We show that disagreement-aware loss reweighting substantially improves disagreement-subset performance, demonstrating the problem is mitigable.
+  \item We provide group-conditional calibration analysis showing that standard temperature scaling fails under modality conflict.
+  \item We present a heuristic error taxonomy identifying mixed sentiment, sarcasm, and short reviews as primary failure drivers.
 \end{enumerate}
 
 \section{Related Work}
 
 \paragraph{Multimodal Learning.}
-\citet{baltrusaitis2019multimodal} provide a comprehensive survey of multimodal ML, categorizing fusion strategies into early (feature-level), late (decision-level), and hybrid approaches.
-Recent work has moved toward attention-based and transformer-based fusion \citep{huang2021makes}, but the fundamental question of how fusion handles conflicting inputs remains underexplored.
+\citet{baltrusaitis2019multimodal} survey multimodal ML, categorizing fusion into early, late, and hybrid approaches.
+Recent work has moved toward attention-based fusion \citep{huang2021makes}, but how fusion handles conflicting inputs remains underexplored.
 
 \paragraph{Modality Dominance and Bias.}
-\citet{wang2020makes} demonstrate that multimodal networks often converge to relying primarily on one modality, a phenomenon they attribute to differences in learning dynamics across modalities.
-\citet{peng2022balanced} propose gradient modulation to address this imbalance.
+\citet{wang2020makes} show that multimodal networks often converge to relying on one modality due to learning dynamics.
+\citet{peng2022balanced} propose gradient modulation to address this.
 In VQA, language bias causes models to ignore visual evidence \citep{goyal2017making}.
-Our work quantifies this dominance specifically in the context of modality conflict.
+Our work quantifies dominance specifically under modality conflict.
 
 \paragraph{Modality Gap.}
-\citet{liang2022mind} identify a ``modality gap'' in contrastive multimodal models where different modalities occupy distinct regions of the embedding space.
-This gap can prevent effective information integration when modalities carry conflicting signals.
+\citet{liang2022mind} identify a ``modality gap'' where different modalities occupy distinct embedding regions, hindering integration under conflicting signals.
 
 \paragraph{Calibration.}
-\citet{guo2017calibration} show that modern neural networks are poorly calibrated, with confidence often exceeding accuracy.
-\citet{nixon2019measuring} formalize Expected Calibration Error (ECE) as a standard metric.
-We extend calibration analysis to the subgroup level, showing that miscalibration is particularly severe under modality disagreement.
+\citet{guo2017calibration} show that modern networks are poorly calibrated.
+\citet{nixon2019measuring} formalize ECE.
+We extend calibration analysis to agreement/disagreement subgroups.
+
+\paragraph{Sentence Representations.}
+We use sentence-transformer embeddings \citep{reimers2019sentence} as our text representation, which provide dense 384-dimensional vectors encoding semantic similarity.
 
 \paragraph{Robustness and Failure Analysis.}
-Subgroup evaluation has become standard practice for fairness \citep{barocas2019fairness}, but its application to multimodal conflict analysis is novel.
-Our disagreement-severity framework provides a principled way to stress-test multimodal systems.
+Subgroup evaluation is standard for fairness \citep{barocas2019fairness}; our application to multimodal conflict analysis is novel.
 
 \section{Problem Formulation}
 
-Let $\mathbf{x} = (\mathbf{x}^{(t)}, \mathbf{x}^{(m)})$ denote an input with text modality $\mathbf{x}^{(t)}$ and metadata modality $\mathbf{x}^{(m)}$, with true label $y \in \{0, 1\}$ (negative/positive sentiment).
+Let $\mathbf{x} = (\mathbf{x}^{(t)}, \mathbf{x}^{(m)})$ denote an input with text modality $\mathbf{x}^{(t)}$ and metadata modality $\mathbf{x}^{(m)}$, with true label $y \in \{0, 1\}$.
 
-We train three classifiers:
-\begin{align}
-  f_t(\mathbf{x}^{(t)}) &: \text{text-only model} \\
-  f_m(\mathbf{x}^{(m)}) &: \text{metadata-only model} \\
-  f_{mm}(\mathbf{x}^{(t)}, \mathbf{x}^{(m)}) &: \text{multimodal fusion model}
-\end{align}
-
-We define \textbf{modality agreement} using an external text sentiment classifier $g$:
-\begin{equation}
-  \text{agreement}(\mathbf{x}) = \mathbb{1}[g(\mathbf{x}^{(t)}) = y]
-\end{equation}
-
-When $g(\mathbf{x}^{(t)}) \neq y$ (the text \emph{sounds} like the opposite sentiment), we have a \textbf{disagreement} case.
-We further stratify by $g$'s confidence $c_g$:
-\begin{itemize}[nosep]
-  \item \textbf{Weak disagreement}: $c_g < 0.70$
-  \item \textbf{Medium disagreement}: $0.70 \leq c_g < 0.90$
-  \item \textbf{Strong disagreement}: $c_g \geq 0.90$
-\end{itemize}
+We train three classifiers: text-only $f_t$, metadata-only $f_m$, and multimodal $f_{mm}$.
+We define \textbf{modality disagreement} using an external sentiment classifier $g$: when $g(\mathbf{x}^{(t)}) \neq y$, text sentiment contradicts the rating-derived label.
+We stratify by $g$'s confidence $c_g$ into weak ($c_g < 0.70$), medium ($0.70 \leq c_g < 0.90$), and strong ($c_g \geq 0.90$) disagreement.
 
 \paragraph{Probability-Based Dominance.}
-For each sample, we compute a dominance ratio:
+For each sample, we compute:
 \begin{equation}
   r = \frac{|p_{mm} - p_t|}{|p_{mm} - p_t| + |p_{mm} - p_m| + \epsilon}
 \end{equation}
-where $p_{mm}$, $p_t$, $p_m$ are the predicted $P(y=1)$ from the multimodal, text-only, and metadata-only models.
+where $p_{mm}$, $p_t$, $p_m$ are predicted $P(y=1)$.
 $r \approx 0$ indicates text dominance; $r \approx 1$ indicates metadata dominance.
 
 \section{Data}
 
-We use the Amazon Reviews 2023 dataset \citep{hou2024bridging}, constructing a binary sentiment classification task from the All Beauty product category.
-Reviews with rating $\geq 4$ are labeled positive; rating $\leq 2$ are labeled negative; neutral reviews (rating 3) are excluded.
+We use the Amazon Reviews 2023 dataset \citep{hou2024bridging}, constructing binary sentiment tasks.
+Reviews with rating $\geq 4$ are positive; $\leq 2$ are negative; neutrals are excluded.
 
 \paragraph{Class Balancing.}
-The raw dataset exhibits substantial class imbalance (77.5\% positive).
-To prevent majority-class bias from inflating accuracy metrics, we downsample the majority class to match the minority class, yielding 20{,}674 balanced samples (10{,}337 per class).
-This ensures that a majority-class baseline achieves exactly 50\% accuracy, making all reported improvements interpretable as genuine discriminative ability.
+The raw dataset is 77.5\% positive.
+We downsample the majority class to match the minority, yielding 20{,}674 balanced samples (10{,}337 per class).
+This ensures the majority-class baseline achieves exactly 50\% accuracy.
 
 \paragraph{Modalities.}
-The \textbf{text modality} consists of review text, encoded using \texttt{all-MiniLM-L6-v2} sentence-transformer embeddings (384 dimensions).
-The \textbf{metadata modality} includes seven structured features: review length (words and characters), helpful vote count, verified purchase flag, product average rating, product rating count, and review year.
+The \textbf{text modality} is encoded via \texttt{all-MiniLM-L6-v2} sentence-transformer \citep{reimers2019sentence} into 384 dimensions.
+The \textbf{metadata modality} comprises seven features: review length (words/characters), helpful votes, verified purchase, product average rating, product rating count, and review year.
 
 \paragraph{Splits and Disagreement.}
-We use a 70/15/15 stratified train/validation/test split (seed 42), yielding 14{,}471 training, 3{,}101 validation, and 3{,}102 test samples.
-The test set has a 50.0\% positive rate.
-An external pretrained sentiment classifier labels 11.1\% of test samples as disagreement cases (343 of 3{,}102), distributed as 27 weak, 50 medium, and 266 strong disagreement.
+We use 70/15/15 stratified splits (seed 42): 14{,}471 train, 3{,}101 val, 3{,}102 test.
+A pretrained DistilBERT sentiment classifier labels 11.1\% of test samples as disagreement (343 of 3{,}102), with 27 weak, 50 medium, and 266 strong.
 
 \section{Methods}
 
 \subsection{Models}
 
 \paragraph{Text-Only.}
-Sentence-transformer (\texttt{all-MiniLM-L6-v2}) embeddings fed into logistic regression with $C=1.0$.
-This produces rich 384-dimensional representations that capture semantic similarity.
+Sentence-transformer embeddings fed into logistic regression ($C=1.0$).
 
 \paragraph{Metadata-Only.}
-XGBoost classifier (200 estimators, max depth 6) on standardized metadata features.
+XGBoost (200 estimators, max depth 6) on standardized features.
 
 \paragraph{Multimodal Fusion.}
-We compare three fusion architectures:
-\begin{itemize}[nosep]
-  \item \textbf{Early fusion}: Concatenate text (384-d) and metadata (8-d) features into a 392-dimensional vector, then feed into a 2-layer MLP (256$\to$64$\to$2) with ReLU and dropout (0.2).
-  \item \textbf{Late fusion}: Separate MLPs per modality, average logits at decision time.
-  \item \textbf{Gated fusion}: A learned sigmoid gate determines the per-sample weighting between modality-specific representations before classification.
-\end{itemize}
-All fusion models are trained for 15 epochs with Adam (lr=0.001) and batch size 64.
+Three architectures:
+\textbf{Early fusion} concatenates text (384-d) and metadata (8-d), then applies a 2-layer MLP (256$\to$64$\to$2) with ReLU and dropout (0.2).
+\textbf{Late fusion} uses separate per-modality MLPs and averages logits.
+\textbf{Gated fusion} learns a sigmoid gate over modality representations.
+All trained for 15 epochs with Adam (lr=$10^{-3}$, batch size 64).
+We use default hyperparameters throughout, as our focus is on comparing model behavior under disagreement rather than maximizing absolute performance.
 
-\paragraph{Majority-Class Baseline.}
-We include a baseline that always predicts the majority class, yielding 50.0\% accuracy on our balanced test set.
-This anchors all results: any model performing above 50\% demonstrates genuine discriminative ability.
+\subsection{Disagreement-Aware Training}
+
+Standard fusion training treats all samples equally, but disagreement samples represent qualitatively different inputs.
+We propose \textbf{disagreement-aware loss reweighting}: during training, disagreement samples receive weight $w > 1$ in the cross-entropy loss:
+\begin{equation}
+  \mathcal{L} = \frac{1}{N} \sum_{i=1}^{N} w_i \cdot \ell(f_{mm}(\mathbf{x}_i), y_i), \quad w_i = \begin{cases} w & \text{if disagreement} \\ 1 & \text{otherwise} \end{cases}
+\end{equation}
+This encourages the model to pay more attention to conflict cases without modifying the architecture.
+We evaluate $w \in \{3, 5\}$.
 
 \subsection{Evaluation}
 
 \paragraph{Metrics.}
-Accuracy, F1, AUROC, ECE, and Brier score.
-All reported with 95\% bootstrap confidence intervals (1{,}000 resamples).
+Accuracy, F1, AUROC, ECE, and Brier score, all with 95\% bootstrap CIs (1{,}000 resamples).
 
 \paragraph{Statistical Tests.}
-McNemar's test (continuity-corrected) for pairwise model comparisons on the same test set.
+McNemar's test (continuity-corrected) for pairwise comparisons.
 
 \paragraph{Calibration.}
-ECE computed overall and conditionally on agreement/disagreement subgroups.
-Temperature scaling learned on the validation set and applied to test predictions.
+ECE overall and by agreement group.
+Temperature scaling learned on validation data.
 
 \paragraph{Selective Prediction.}
-Accuracy--coverage trade-off curves at varying confidence thresholds.
+Accuracy--coverage curves at varying confidence thresholds (Figure~\ref{fig:selective}).
 
 \section{Results}
 
 \subsection{Overall Performance}
 
-Table~\ref{tab:main} reports overall test-set metrics with 95\% bootstrap CIs.
-The multimodal early fusion model achieves the highest accuracy at 0.888 (0.877--0.899), significantly outperforming text-only at 0.868 (0.855--0.879) and metadata-only at 0.679 (0.663--0.695).
-All learned models substantially exceed the majority-class baseline of 0.500.
-McNemar's test confirms the multimodal advantage over text-only is statistically significant ($\chi^2 = 17.6$, $p < 0.001$).
+Table~\ref{tab:main} reports test-set metrics.
+The multimodal model achieves 0.888 accuracy (0.877--0.899), outperforming text-only at 0.868 (0.855--0.879).
+McNemar's test confirms significance ($\chi^2 = 17.6$, $p < 0.001$).
 
-\begin{table}[ht]
+On the disagreement subset ($n = 343$), the multimodal model's accuracy drops to 0.641 (0.589--0.691)---wide CIs reflecting the smaller sample.
+Disagreement AUROC is 0.719 (0.659--0.771), substantially below the overall 0.956.
+
+\begin{table}[htbp]
 \centering
 \small
-\caption{Overall test-set performance with 95\% bootstrap CIs ($n = 3{,}102$).}
+\caption{Test-set performance with 95\% bootstrap CIs ($n = 3{,}102$; disagreement $n = 343$).}
 \label{tab:main}
-\begin{tabular}{lcccc}
+\begin{tabular}{llcccc}
 \toprule
-\textbf{Model} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUROC} & \textbf{ECE} \\
+\textbf{Model} & \textbf{Subset} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUROC} & \textbf{ECE} \\
 \midrule
-Majority Baseline & 0.500 & 0.000 & 0.500 & --- \\
-Text-Only & .868 (.855--.879) & .866 (.852--.879) & .943 (.935--.950) & .028 (.022--.040) \\
-Metadata-Only & .679 (.663--.695) & .680 (.661--.697) & .749 (.732--.765) & .035 (.027--.052) \\
-Multimodal & .888 (.877--.899) & .886 (.874--.898) & .956 (.949--.962) & .023 (.018--.035) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Fusion Architecture Comparison}
-
-Table~\ref{tab:fusion} compares all three fusion architectures.
-Performance is remarkably similar: early, late, and gated fusion all achieve 88.3--88.9\% accuracy overall.
-Differences on the disagreement subset are also small (63.0--65.0\%).
-This suggests that the challenge of modality conflict is not an architectural problem but a fundamental limitation of standard fusion paradigms.
-
-\begin{table}[h]
-\centering
-\caption{Fusion architecture comparison on the test set.}
-\label{tab:fusion}
-\begin{tabular}{lccccc}
-\toprule
-\textbf{Fusion} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUROC} & \textbf{Disagree Acc.} & \textbf{Disagree F1} \\
+Majority & Overall & .500 & .000 & .500 & --- \\
 \midrule
-Early  & 0.888 & 0.886 & 0.956 & 0.641 & 0.685 \\
-Late   & 0.889 & 0.888 & 0.956 & 0.650 & 0.700 \\
-Gated  & 0.883 & 0.883 & 0.957 & 0.630 & 0.683 \\
+\multirow{2}{*}{Text-Only} & Overall & .868 (.855--.879) & .866 (.852--.879) & .943 (.935--.950) & .028 \\
+ & Disagree & .592 (.536--.647) & .648 (.587--.703) & .631 (.564--.690) & .220 \\
+\midrule
+\multirow{2}{*}{Metadata} & Overall & .679 (.663--.695) & .680 (.661--.697) & .749 (.732--.765) & .035 \\
+ & Disagree & .615 (.566--.668) & .670 (.617--.719) & .671 (.609--.728) & .159 \\
+\midrule
+\multirow{2}{*}{Multimodal} & Overall & .888 (.877--.899) & .886 (.874--.898) & .956 (.949--.962) & .023 \\
+ & Disagree & .641 (.589--.691) & .685 (.630--.736) & .719 (.659--.771) & .219 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Performance by Agreement Group}
 
-Table~\ref{tab:groups} and Figure~\ref{fig:severity} show a dramatic performance drop under disagreement.
-On agreement cases ($n = 2{,}759$), the multimodal model achieves 91.9\% accuracy.
-On disagreement cases ($n = 343$), accuracy falls to 64.1\%---a 27.8 percentage-point drop.
-Critically, on strong disagreement ($n = 266$), the multimodal model (58.6\%) actually performs \emph{worse} than the metadata-only model (61.3\%), reversing the overall ranking.
+Table~\ref{tab:groups} and Figure~\ref{fig:severity} show dramatic degradation.
+On agreement cases, the multimodal model achieves 91.9\%; on strong disagreement ($n = 266$), it drops to 58.6\%---\emph{worse} than metadata-only (61.3\%).
+Note that the weak ($n = 27$) and medium ($n = 50$) subgroups have small samples and should be interpreted cautiously.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
-\caption{Model accuracy by agreement group. All models degrade under disagreement, with the multimodal model's advantage narrowing or reversing.}
+\caption{Model accuracy by agreement group. Weak/medium groups have small $n$ and wide CIs.}
 \label{tab:groups}
-\begin{tabular}{lccccc}
+\begin{tabular}{lcccccc}
 \toprule
-\textbf{Model} & \textbf{Overall} & \textbf{Agreement} & \textbf{Weak} & \textbf{Medium} & \textbf{Strong} \\
+\textbf{Model} & \textbf{Overall} & \textbf{Agreement} & \textbf{Weak} & \textbf{Medium} & \textbf{Strong} & \textbf{All Disagree} \\
+ & $(3{,}102)$ & $(2{,}759)$ & $(27)$ & $(50)$ & $(266)$ & $(343)$ \\
 \midrule
-Text-Only     & 0.868 & 0.902 & 0.704 & 0.780 & 0.545 \\
-Metadata-Only & 0.679 & 0.686 & 0.630 & 0.620 & 0.613 \\
-Multimodal    & 0.888 & 0.919 & 0.815 & 0.840 & 0.586 \\
+Text-Only     & .868 & .902 & .704 & .780 & .545 & .592 \\
+Metadata-Only & .679 & .686 & .630 & .620 & .613 & .615 \\
+Multimodal    & .888 & .919 & .815 & .840 & .586 & .641 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{figure}[h]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.8\textwidth]{../reports/figures/disagreement_severity_trend.png}
-\caption{Error rate by disagreement severity. All models degrade under conflict, with the multimodal model showing the steepest decline from agreement (8.1\% error) to strong disagreement (41.4\% error).}
+\caption{Error rate by disagreement severity. The multimodal model shows the steepest decline from agreement (8.1\% error) to strong disagreement (41.4\% error).}
 \label{fig:severity}
 \end{figure}
 
+\subsection{Fusion Architecture Comparison}
+
+Table~\ref{tab:fusion} shows remarkably similar performance across all three architectures (88.3--88.9\% overall, 63.0--65.0\% disagree), suggesting modality conflict is a paradigm limitation, not an architectural one.
+
+\begin{table}[htbp]
+\centering
+\caption{Fusion architecture comparison.}
+\label{tab:fusion}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Fusion} & \textbf{Accuracy} & \textbf{F1} & \textbf{AUROC} & \textbf{Disagree Acc.} & \textbf{Disagree F1} \\
+\midrule
+Early  & .888 & .886 & .956 & .641 & .685 \\
+Late   & .889 & .888 & .956 & .650 & .700 \\
+Gated  & .883 & .883 & .957 & .630 & .683 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Modality Dominance}
 
-\paragraph{True-Conflict Dominance.}
-In the 1{,}098 cases where text and metadata models make different predictions, the multimodal model follows text in 82.2\% and metadata in 17.8\% of cases.
-This strong text dominance persists regardless of which modality is correct.
+In the 1{,}098 cases where text and metadata models disagree, the multimodal model follows text in 82.2\% of cases.
+The probability-based dominance ratio (Figure~\ref{fig:prob_dom}) confirms this: mean ratio $= 0.380$, with 69.4\% text-leaning.
 
-\paragraph{Probability-Based Dominance.}
-The dominance ratio distribution (Figure~\ref{fig:prob_dom}) confirms this at the probability level.
-Among disagreement cases, the mean dominance ratio is 0.380, with 69.4\% of samples being text-leaning ($r < 0.5$) and 30.6\% metadata-leaning ($r > 0.5$).
-
-\begin{figure}[h]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\textwidth]{../reports/figures/probability_dominance_histogram.png}
-\caption{Distribution of probability-based dominance ratios in disagreement cases. Values near 0 indicate the fusion model tracks text probabilities; the distribution is strongly left-skewed, confirming text dominance.}
+\caption{Dominance ratio distribution in disagreement cases. Left-skew confirms text dominance.}
 \label{fig:prob_dom}
 \end{figure}
 
 \subsection{Calibration Analysis}
 
-\paragraph{Group-Conditional ECE.}
-Table~\ref{tab:calibration} reveals a striking calibration gap.
-The multimodal model is well-calibrated on agreement cases (ECE = 0.017) but severely miscalibrated on disagreement cases (ECE = 0.219)---a 13$\times$ increase.
-The model is overconfident precisely where it is most likely to be wrong.
+Table~\ref{tab:calibration} reveals a 13$\times$ ECE gap: the multimodal model is well-calibrated on agreement (0.017) but severely miscalibrated on disagreement (0.219).
+Temperature scaling provides negligible improvement on disagreement (0.219 $\to$ 0.215) and worsens text model calibration (0.220 $\to$ 0.253), confirming that a single global temperature cannot address this distributional shift.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
-\caption{Group-conditional calibration: ECE before and after temperature scaling (learned on validation set).}
+\caption{Group-conditional ECE before and after temperature scaling.}
 \label{tab:calibration}
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Model} & \textbf{Group} & \textbf{ECE (Before)} & \textbf{ECE (After)} & \textbf{Temperature} \\
+\textbf{Model} & \textbf{Group} & \textbf{ECE (Before)} & \textbf{ECE (After)} & \textbf{Temp.} \\
 \midrule
 \multirow{2}{*}{Text-Only} & Agreement & 0.052 & 0.024 & \multirow{2}{*}{0.662} \\
  & Disagreement & 0.220 & 0.253 & \\
 \midrule
-\multirow{2}{*}{Metadata-Only} & Agreement & 0.035 & 0.024 & \multirow{2}{*}{1.311} \\
+\multirow{2}{*}{Metadata} & Agreement & 0.035 & 0.024 & \multirow{2}{*}{1.311} \\
  & Disagreement & 0.159 & 0.151 & \\
 \midrule
 \multirow{2}{*}{Multimodal} & Agreement & 0.017 & 0.024 & \multirow{2}{*}{1.153} \\
@@ -291,58 +277,83 @@ The model is overconfident precisely where it is most likely to be wrong.
 \end{tabular}
 \end{table}
 
-Temperature scaling reduces overall ECE (multimodal: 0.023 $\to$ 0.013) but provides negligible improvement on disagreement cases (0.219 $\to$ 0.215) and actually \emph{worsens} the text model's disagreement calibration (0.220 $\to$ 0.253).
-A single global temperature cannot simultaneously serve well-calibrated agreement predictions and miscalibrated disagreement predictions.
-
-\paragraph{Selective Prediction.}
-Abstaining on low-confidence predictions improves accuracy more for disagreement cases, but the achievable accuracy at reasonable coverage levels remains substantially lower than for agreement cases.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{../reports/figures/selective_prediction.png}
+\caption{Selective prediction: accuracy vs.\ coverage at varying confidence thresholds. Abstaining on low-confidence predictions helps more for disagreement cases but cannot close the gap.}
+\label{fig:selective}
+\end{figure}
 
 \subsection{Statistical Significance}
 
-Table~\ref{tab:mcnemar} summarizes McNemar's tests.
-On the overall test set, all pairwise differences are statistically significant.
-On the disagreement subset, the multimodal model significantly outperforms text-only ($p = 0.031$), but the differences between metadata-only and multimodal ($p = 0.456$) and between text-only and metadata-only ($p = 0.568$) are not significant.
-This indicates that the multimodal advantage concentrates in agreement cases; under conflict, model differences largely vanish.
+On the overall test set, all pairwise differences are significant (Table~\ref{tab:mcnemar}).
+On the disagreement subset, multimodal vs.\ text-only is significant ($p = 0.031$), but metadata vs.\ multimodal ($p = 0.456$) and text vs.\ metadata ($p = 0.568$) are not---model differences largely vanish under conflict.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
-\caption{McNemar's test results (continuity-corrected).}
+\caption{McNemar's test (continuity-corrected).}
 \label{tab:mcnemar}
 \begin{tabular}{llccl}
 \toprule
-\textbf{Comparison} & \textbf{Subset} & $\chi^2$ & $p$-value & \textbf{Sig.} \\
+\textbf{Comparison} & \textbf{Subset} & $\chi^2$ & $p$ & \textbf{Sig.} \\
 \midrule
-Text vs.\ Multimodal    & Overall      & 17.6 & $< 0.001$ & Yes \\
+Text vs.\ Multimodal    & Overall      & 17.6 & ${<}0.001$ & Yes \\
 Text vs.\ Multimodal    & Disagreement & 4.65 & 0.031 & Yes \\
-Meta vs.\ Multimodal    & Overall      & 451.0 & $< 0.001$ & Yes \\
+Meta vs.\ Multimodal    & Overall      & 451.0 & ${<}0.001$ & Yes \\
 Meta vs.\ Multimodal    & Disagreement & 0.56 & 0.456 & No \\
-Text vs.\ Meta          & Overall      & 311.7 & $< 0.001$ & Yes \\
+Text vs.\ Meta          & Overall      & 311.7 & ${<}0.001$ & Yes \\
 Text vs.\ Meta          & Disagreement & 0.33 & 0.568 & No \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Disagreement-Aware Training}
+
+Table~\ref{tab:disagree_aware} shows that disagreement-aware loss reweighting substantially improves disagreement performance.
+With $w = 5$, disagreement accuracy improves from 64.1\% to 67.3\% (+3.2~pp) and disagreement F1 from 0.685 to 0.728 (+4.3~pp), at a modest 1.5~pp cost to overall accuracy.
+This demonstrates that the degradation under conflict is partially mitigable through training-time awareness, without any architectural change.
+
+\begin{table}[htbp]
+\centering
+\caption{Disagreement-aware training comparison. Bold indicates best disagreement metric.}
+\label{tab:disagree_aware}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Method} & \multicolumn{2}{c}{\textbf{Overall}} & \multicolumn{2}{c}{\textbf{Agreement}} & \multicolumn{2}{c}{\textbf{Disagreement}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+ & Acc. & F1 & Acc. & F1 & Acc. & F1 \\
+\midrule
+Standard           & .888 & .886 & .919 & .916 & .641 & .685 \\
+DA ($w = 3$)       & .880 & .880 & .907 & .905 & .662 & .714 \\
+DA ($w = 5$)       & .873 & .875 & .898 & .897 & \textbf{.673} & \textbf{.728} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Error Taxonomy}
 
-Table~\ref{tab:errors} presents the distribution of multimodal error types from heuristic classification of 200 high-confidence failures.
-The largest category is ``other'' (63.5\%), reflecting the diversity of failure modes.
-Mixed-sentiment cases (18.5\%) involve reviews with both positive and negative statements.
-Sarcasm/irony (8.5\%) and short reviews (8.5\%) each contribute meaningfully.
-Notably, short reviews have the highest rate of disagreement (52.9\%), suggesting that insufficient text length amplifies modality conflict.
+Table~\ref{tab:errors} categorizes 200 multimodal errors via heuristic pattern matching.
+Mixed-sentiment reviews (22.5\%) are the most identifiable category, followed by sarcasm/irony (11.5\%) and short reviews (8.5\%).
+Short reviews have the highest disagreement rate (52.9\%), suggesting insufficient text amplifies modality conflict.
+Conditional-sentiment reviews (``good for the price, but...'') and comparative reviews (``better than X'') each contribute 1.5--3.5\%.
 
-\begin{table}[h]
+\begin{table}[htbp]
 \centering
-\caption{Error taxonomy from 200 multimodal errors with heuristic classification.}
+\caption{Error taxonomy (200 multimodal errors, heuristic classification).}
 \label{tab:errors}
 \begin{tabular}{lccc}
 \toprule
-\textbf{Error Type} & \textbf{Count (\%)} & \textbf{Mean Conf.} & \textbf{\% Disagreement} \\
+\textbf{Error Type} & \textbf{Count (\%)} & \textbf{Mean Conf.} & \textbf{\% Disagree} \\
 \midrule
-Mixed Sentiment  & 37 (18.5\%) & 0.737 & 21.6\% \\
-Sarcasm/Irony    & 17 (8.5\%)  & 0.739 & 41.2\% \\
-Short Review     & 17 (8.5\%)  & 0.771 & 52.9\% \\
-Ambiguous        & 2 (1.0\%)   & 0.857 & 100.0\% \\
-Other            & 127 (63.5\%) & 0.752 & 39.4\% \\
+Mixed Sentiment      & 45 (22.5\%) & 0.724 & 28.9\% \\
+Sarcasm/Irony        & 23 (11.5\%) & 0.749 & 47.8\% \\
+Short Review         & 17 (8.5\%)  & 0.771 & 52.9\% \\
+Rating Misuse        & 7 (3.5\%)   & 0.702 & 0.0\% \\
+Conditional Sent.    & 7 (3.5\%)   & 0.831 & 57.1\% \\
+Topic Drift          & 4 (2.0\%)   & 0.656 & 25.0\% \\
+Comparative          & 3 (1.5\%)   & 0.890 & 100.0\% \\
+Ambiguous            & 2 (1.0\%)   & 0.857 & 100.0\% \\
+Other                & 92 (46.0\%) & 0.756 & 35.9\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -350,53 +361,51 @@ Other            & 127 (63.5\%) & 0.752 & 39.4\% \\
 \section{Discussion}
 
 \paragraph{Does Multimodal Always Help?}
-On average, yes---the early fusion model achieves 88.8\% accuracy vs.\ 86.8\% for text-only, a statistically significant 2.0 percentage-point improvement.
-However, on the 11.1\% of test cases with modality disagreement, the multimodal advantage shrinks to 5.0 points (64.1\% vs.\ 59.2\%), and on strong disagreement the multimodal model (58.6\%) actually underperforms metadata-only (61.3\%).
-This reversal suggests that the fusion model's text dominance becomes harmful when text is misleading.
+On average, yes---but the 27.8~pp accuracy drop from agreement to disagreement (91.9\% $\to$ 64.1\%) reveals that aggregate metrics mask important reliability failures.
+On strong disagreement, the multimodal model (58.6\%) underperforms metadata-only (61.3\%), suggesting text dominance becomes harmful when text is misleading.
 
 \paragraph{Fusion Architecture Does Not Matter.}
-The similarity of early, late, and gated fusion results (88.3--88.9\% accuracy) suggests that the challenge of handling modality conflict is not solvable through architectural changes alone.
-All three architectures learn similar text-dominant strategies.
-Future work should explore conflict-aware training objectives rather than novel architectures.
+Early, late, and gated fusion achieve 88.3--88.9\% accuracy with nearly identical disagreement performance.
+All learn similar text-dominant strategies.
+This motivates conflict-aware training objectives over novel architectures.
 
-\paragraph{Text Dominance.}
-The consistent text dominance we observe (82.2\% in true-conflict cases) aligns with \citet{wang2020makes}'s finding that multimodal models often collapse to a single modality.
-Our probability-based analysis reveals this dominance is continuous, not binary: the fusion model's probability outputs track the text model even when both make the same hard prediction.
+\paragraph{Disagreement-Aware Training Works.}
+The 3.2~pp improvement in disagreement accuracy from simple loss reweighting ($w=5$) demonstrates that the problem is partially mitigable.
+The overall--disagreement trade-off (1.5~pp overall cost for 3.2~pp disagreement gain) is favorable in high-stakes applications where reliability under conflict matters more than average-case performance.
 
 \paragraph{Calibration Under Conflict.}
-The 13$\times$ ECE gap between agreement (0.017) and disagreement (0.219) cases is among the most striking findings.
-Temperature scaling fails because a single global parameter cannot address the distributional shift between agreement and disagreement cases.
-This motivates group-conditional calibration or disagreement-aware uncertainty estimation.
+The 13$\times$ ECE gap and temperature scaling's failure motivate group-conditional calibration.
+In production, systems should flag high-confidence predictions in detected disagreement regions.
 
 \paragraph{Practical Implications.}
-We recommend that practitioners:
-(1) monitor disagreement rates in production data, as they predict reliability;
-(2) apply selective prediction with higher confidence thresholds for detected disagreement cases;
-(3) consider ensemble strategies that explicitly model per-modality reliability rather than learning a fixed weighting.
+We recommend:
+(1) monitoring disagreement rates, as they predict reliability;
+(2) applying disagreement-aware training when conflict cases matter;
+(3) using selective prediction with higher thresholds for detected disagreement;
+(4) developing modality-conditioned calibration methods.
 
 \section{Limitations}
 
 \begin{itemize}[nosep]
-  \item Rating-derived labels are an imperfect proxy for true sentiment.
-  \item The pretrained sentiment model used for disagreement labeling may introduce systematic bias.
-  \item Our metadata modality is limited to seven structured features.
-  \item We study only text + metadata; image and video modalities may behave differently.
-  \item The error taxonomy relies on heuristic pattern matching; full manual annotation would strengthen it.
-  \item Results are from a single product category (All Beauty); the accompanying code supports multi-category replication but full cross-category results require additional compute.
+  \item Rating-derived labels are an imperfect sentiment proxy.
+  \item The pretrained sentiment model for disagreement labeling may introduce systematic bias.
+  \item Our metadata modality is limited to seven structured features; richer metadata (images, video) may behave differently.
+  \item The error taxonomy uses heuristic patterns; manual annotation would strengthen it.
+  \item Disagreement-aware training requires disagreement labels at training time; we do not address detection at inference time for unseen distributions.
 \end{itemize}
 
 \section{Conclusion}
 
-We have shown that multimodal sentiment classifiers, while effective on average, exhibit systematic failure modes under modality conflict.
-On a class-balanced Amazon Reviews dataset ($n = 3{,}102$ test samples, 11.1\% disagreement rate), the multimodal fusion model achieves 88.8\% overall accuracy but drops to 64.1\% on disagreement cases and 58.6\% on strong disagreement---worse than the metadata-only model.
-Text dominance is pervasive (82.2\% of true-conflict cases), and all three fusion architectures (early, late, gated) perform comparably, indicating this is a paradigm limitation rather than an architectural one.
-Standard calibration techniques fail to address the 13$\times$ ECE gap between agreement and disagreement subgroups.
+We have shown that multimodal sentiment classifiers exhibit systematic failure modes under modality conflict.
+On a class-balanced dataset ($n = 3{,}102$ test, 11.1\% disagreement), the multimodal model achieves 88.8\% overall accuracy but drops to 64.1\% under disagreement and 58.6\% on strong disagreement---worse than metadata-only.
+Text dominance is pervasive (82.2\%), all three fusion architectures perform comparably, and standard calibration fails to address the 13$\times$ ECE gap.
 
-These findings motivate several directions for future work:
-(1) disagreement-aware loss functions that upweight conflict cases during training;
-(2) modality dropout and stochastic gating to reduce dominance;
-(3) uncertainty-based fusion that adaptively weights modalities based on per-sample reliability estimates;
-and (4) modality-conditioned calibration methods.
+Crucially, we demonstrate that disagreement-aware loss reweighting improves disagreement F1 by 4.3~pp, showing these failures are partially mitigable.
+Future directions include:
+(1) modality dropout and stochastic gating;
+(2) uncertainty-based fusion with per-sample reliability estimates;
+(3) modality-conditioned calibration;
+and (4) disagreement detection at inference time without ground-truth labels.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

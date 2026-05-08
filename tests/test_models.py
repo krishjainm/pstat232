@@ -36,9 +36,10 @@ def test_fusion_dataset():
     labels = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
     ds = FusionDataset(features, labels)
     assert len(ds) == 10
-    feat, label = ds[0]
+    feat, label, weight = ds[0]
     assert feat.shape == (50,)
     assert label.item() in (0, 1)
+    assert weight.item() == 1.0
 
 
 def test_gated_fusion_gate_values():

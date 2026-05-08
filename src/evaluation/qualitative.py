@@ -26,7 +26,7 @@ ERROR_CATEGORIES = {
         r"(?i)(?:shipping|delivery|package|arrived|shipped|ups|fedex|usps).*(?:late|slow|damaged|wrong|broken)",
         r"(?i)(?:seller|vendor|customer service|return|refund).*(?:bad|terrible|awful|rude|unhelpful)",
         r"(?i)(?:wrong (?:item|product|size|color)|never (?:arrived|received|showed))",
-        r"(?i)(?:gift|present|someone else|for my)",
+        r"(?i)(?:gift|present|someone else|bought (?:this |it )?for my)",
     ],
     "comparative": [
         r"(?i)(?:better|worse|cheaper|more expensive) than",
