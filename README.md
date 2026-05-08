@@ -1,25 +1,25 @@
-# When Modalities Disagree: Failure Modes in Multimodal Sentiment Classification
-
-**PSTAT 262DS Final Project**
+# When Modalities Disagree: Failure Modes and Mitigations in Multimodal Sentiment Classification
 
 ## Research Question
 
-How do multimodal models behave when input modalities conflict, and which modality dominates under disagreement?
+How do multimodal models behave when input modalities conflict, which modality dominates under disagreement, and can simple training-time interventions help?
 
 ## Overview
 
-Multimodal models combine multiple sources of information (e.g., text and metadata) under the assumption that more data improves predictions. This project investigates what happens when those sources *disagree*—for example, when a review's text sounds positive but its star rating is low. We study whether multimodal fusion improves robustness or introduces new failure modes under modality conflict.
+Multimodal models combine multiple sources of information (e.g., text and metadata) under the assumption that more data improves predictions. This project investigates what happens when those sources *disagree*—for example, when a review's text sounds positive but its star rating is low. We show that fusion models degrade dramatically under modality conflict, then demonstrate that **disagreement-aware loss reweighting** can partially mitigate these failures.
 
 ## Key Findings
 
-| Metric | Text-Only | Metadata-Only | Multimodal (Early) |
-|--------|-----------|---------------|-------------------|
-| Overall Accuracy | 0.868 | 0.679 | **0.888** |
-| Disagreement Accuracy | 0.592 | 0.615 | 0.641 |
-| Strong Disagree Accuracy | 0.545 | **0.613** | 0.586 |
-| AUROC | 0.943 | 0.749 | **0.956** |
+| Metric | Text-Only | Metadata-Only | Multimodal | DA (w=5) |
+|--------|-----------|---------------|------------|----------|
+| Overall Accuracy | 0.868 | 0.679 | **0.888** | 0.873 |
+| Disagreement Accuracy | 0.592 | 0.615 | 0.641 | **0.673** |
+| Disagreement F1 | 0.648 | 0.670 | 0.685 | **0.728** |
+| Strong Disagree Acc. | 0.545 | **0.613** | 0.586 | — |
+| AUROC | 0.943 | 0.749 | **0.956** | 0.944 |
 
 - Multimodal fusion improves average accuracy (+2.0 pp over text-only) but degrades disproportionately under modality conflict (64.1% on disagreement vs. 91.9% on agreement).
+- **Disagreement-aware reweighting (w=5)** improves disagreement accuracy by +3.2 pp and F1 by +4.3 pp, at only 1.5 pp overall cost.
 - The fusion model follows text predictions in **82.2%** of true-conflict cases.
 - All three fusion architectures (early, late, gated) perform comparably (88.3–88.9%), suggesting the problem is paradigmatic, not architectural.
 - Disagreement induces severe miscalibration: ECE of 0.219 vs. 0.017 for agreement cases (13× increase). Temperature scaling fails to close this gap.
@@ -42,6 +42,7 @@ Multimodal models combine multiple sources of information (e.g., text and metada
 | Multimodal (Early) | Text + metadata (392-d) | 2-layer MLP (256→64→2) with ReLU + dropout |
 | Multimodal (Late) | Text + metadata | Separate MLPs, averaged logits |
 | Multimodal (Gated) | Text + metadata | Learned sigmoid gate over modality representations |
+| Disagree-Aware | Text + metadata | Early fusion + disagreement-weighted cross-entropy loss |
 | Majority Baseline | — | Always predicts majority class (50% on balanced data) |
 
 ## Analyses
@@ -50,10 +51,12 @@ Multimodal models combine multiple sources of information (e.g., text and metada
 2. **Group-level evaluation**: Accuracy, F1, AUROC with 95% bootstrap CIs for agreement vs. disagreement subsets.
 3. **Modality dominance**: Label-based, probability-based, and true-conflict dominance analysis.
 4. **Fusion comparison**: Side-by-side evaluation of early, late, and gated fusion architectures.
-5. **Statistical significance**: McNemar's test (continuity-corrected) for all pairwise model comparisons.
-6. **Calibration**: Group-conditional ECE, temperature scaling experiments, selective prediction curves.
-7. **Feature importance**: XGBoost feature importances for metadata model.
-8. **Error taxonomy**: Heuristic classification of failure modes (sarcasm, mixed sentiment, short reviews, etc.).
+5. **Disagreement-aware training**: Loss reweighting that upweights disagreement samples during training (w ∈ {3, 5}).
+6. **Selective abstention**: Baseline that falls back to metadata predictions when text/metadata disagree.
+7. **Statistical significance**: McNemar's test (continuity-corrected) for all pairwise model comparisons.
+8. **Calibration**: Group-conditional ECE, temperature scaling experiments, selective prediction curves.
+9. **Feature importance**: XGBoost feature importances for metadata model.
+10. **Error taxonomy**: Heuristic classification of failure modes (sarcasm, mixed sentiment, short reviews, conditional sentiment, topic drift, etc.).
 
 ## How to Run
 
@@ -72,9 +75,10 @@ python scripts/07_evaluate_models.py
 python scripts/08_generate_figures.py
 
 # Additional scripts
-python scripts/09_fusion_comparison.py      # Compare early/late/gated fusion
-python scripts/run_all_categories.py        # Run across multiple product categories
-python scripts/run_experiments.py           # Multi-seed experiments
+python scripts/09_fusion_comparison.py          # Compare early/late/gated fusion
+python scripts/10_disagreement_aware.py         # Disagreement-aware training + selective abstention
+python scripts/run_all_categories.py            # Run across multiple product categories
+python scripts/run_experiments.py               # Multi-seed experiments
 
 # Or use Make
 make all                # Full pipeline
@@ -94,10 +98,10 @@ python -m pytest tests/ -v
 
 ## Outputs
 
-- **Tables** (`reports/tables/`): 19 CSV files including main results, group results, bootstrap CIs, McNemar's tests, fusion comparison, calibration, modality dominance, temperature scaling, selective prediction, error taxonomy, and case studies.
+- **Tables** (`reports/tables/`): 20+ CSV files including main results, group results, bootstrap CIs, McNemar's tests, fusion comparison, calibration, modality dominance, temperature scaling, selective prediction, error taxonomy, case studies, and disagreement-aware comparison.
 - **Figures** (`reports/figures/`): 14 PNG figures including class distribution, agreement distribution, accuracy/F1 by group, calibration curves, modality dominance, probability dominance histogram, confidence analysis, confusion matrices, feature importance, calibration by group, and selective prediction curves.
-- **Models** (`models/`): Saved model checkpoints and artifacts for text, metadata, and multimodal models.
-- **Paper** (`paper/main.tex`): Full LaTeX paper (9 pages) with real results, bootstrap CIs, and embedded figures.
+- **Models** (`models/`): Saved model checkpoints and artifacts for text, metadata, multimodal, and disagreement-aware models.
+- **Paper** (`paper/main.tex`): Full LaTeX paper (9 pages) with real results, bootstrap CIs, proposed method, and embedded figures.
 
 ## Project Structure
 
@@ -113,7 +117,7 @@ python -m pytest tests/ -v
 │   │                               # statistical tests, temperature scaling,
 │   │                               # ablation, qualitative analysis
 │   └── visualization/              # Plotting functions
-├── scripts/                        # Runnable pipeline scripts (01–09)
+├── scripts/                        # Runnable pipeline scripts (01–10)
 │   ├── run_all_categories.py       # Multi-category pipeline
 │   └── run_experiments.py          # Multi-seed experiments
 ├── paper/                          # LaTeX paper and references
