@@ -3,6 +3,8 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
@@ -232,3 +234,139 @@ def plot_disagreement_severity_trend(group_df):
     ax.set_title("Error Rate by Disagreement Severity")
     ax.legend()
     save_fig(fig, "disagreement_severity_trend.png")
+
+
+# ---------------------------------------------------------------------------
+# New figures for upgrades 3, 5, 6
+# ---------------------------------------------------------------------------
+
+# 11. Probability dominance histogram
+def plot_probability_dominance_histogram(df):
+    """Histogram of probability-based dominance ratio for disagreement cases."""
+    disagree = df[df["agreement_status"] == "disagreement"]
+    if "dominance_ratio" not in disagree.columns or len(disagree) == 0:
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.hist(disagree["dominance_ratio"], bins=30, color=COLORS[5], edgecolor="white", alpha=0.8)
+    ax.axvline(0.5, color="red", linestyle="--", label="Equal dominance")
+    ax.set_xlabel("Dominance Ratio (0=text, 1=metadata)")
+    ax.set_ylabel("Count")
+    ax.set_title("Probability-Based Dominance Distribution (Disagreement Cases)")
+    ax.legend()
+    save_fig(fig, "probability_dominance_histogram.png")
+
+
+# 12. Metadata feature importance
+def plot_metadata_feature_importance(feat_imp_df):
+    """Bar chart of metadata feature importances."""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    imp_col = "mean_abs_shap" if "mean_abs_shap" in feat_imp_df.columns else "importance"
+    data = feat_imp_df.sort_values(imp_col, ascending=True)
+    ax.barh(data["feature"], data[imp_col], color=COLORS[1])
+    ax.set_xlabel("Importance" if imp_col == "importance" else "Mean |SHAP|")
+    ax.set_title("Metadata Feature Importance")
+    fig.tight_layout()
+    save_fig(fig, "metadata_feature_importance.png")
+
+
+# 13. Group-conditional calibration
+def plot_calibration_by_group(df, n_bins=10):
+    """Calibration curves split by agreement/disagreement for each model."""
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    model_specs = [
+        ("text_only", "text_prob_positive"),
+        ("metadata_only", "meta_prob_positive"),
+        ("multimodal", "mm_prob_positive"),
+    ]
+
+    for ax, (model, prob_col) in zip(axes, model_specs):
+        ax.plot([0, 1], [0, 1], "k--", alpha=0.5)
+        for grp, color, ls in [("agreement", COLORS[0], "-"), ("disagreement", COLORS[3], "--")]:
+            if grp == "agreement":
+                mask = df["agreement_status"] == "agreement"
+            else:
+                mask = df["agreement_status"] == "disagreement"
+            subset = df[mask]
+            if len(subset) == 0:
+                continue
+            ece, ba, bc, bcount = expected_calibration_error(
+                subset["label"].values, subset[prob_col].values, n_bins
+            )
+            m = bcount > 0
+            ax.plot(bc[m], ba[m], "o-", color=color, linestyle=ls,
+                    label=f"{grp.title()} (ECE={ece:.3f})")
+        ax.set_title(MODEL_NAMES[model])
+        ax.set_xlabel("Predicted Probability")
+        ax.set_ylabel("Actual Frequency")
+        ax.legend(fontsize=9)
+
+    fig.suptitle("Group-Conditional Calibration Curves", y=1.02)
+    fig.tight_layout()
+    save_fig(fig, "calibration_by_group.png")
+
+
+# 14. Selective prediction curves
+def plot_selective_prediction(sel_pred_df):
+    """Accuracy vs coverage curves for selective prediction."""
+    if len(sel_pred_df) == 0:
+        return
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+    for ax, (model, label) in zip(axes, MODEL_NAMES.items()):
+        model_data = sel_pred_df[sel_pred_df["model"] == model]
+        for grp, color, ls in [("overall", "gray", "-"), ("agreement", COLORS[0], "--"),
+                                ("disagreement", COLORS[3], ":")]:
+            grp_data = model_data[model_data["group"] == grp].sort_values("coverage")
+            if len(grp_data) == 0:
+                continue
+            ax.plot(grp_data["coverage"], grp_data["accuracy"], ls,
+                    color=color, label=grp.title(), linewidth=2)
+
+        ax.set_xlabel("Coverage")
+        ax.set_ylabel("Accuracy")
+        ax.set_title(label)
+        ax.legend(fontsize=9)
+        ax.set_xlim(0, 1.05)
+        ax.set_ylim(0.5, 1.02)
+
+    fig.suptitle("Selective Prediction: Accuracy vs Coverage", y=1.02)
+    fig.tight_layout()
+    save_fig(fig, "selective_prediction.png")
+
+
+# 15. Cross-category comparison
+def plot_cross_category_results(cross_cat_df):
+    """Bar chart comparing disagreement rates and accuracy across categories."""
+    if cross_cat_df is None or len(cross_cat_df) == 0:
+        return
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    cats = cross_cat_df["category"].values
+
+    # Disagreement rates
+    if "disagreement_rate" in cross_cat_df.columns:
+        axes[0].bar(cats, cross_cat_df["disagreement_rate"] * 100, color=COLORS[3])
+        axes[0].set_ylabel("Disagreement Rate (%)")
+        axes[0].set_title("Cross-Category Disagreement Rates")
+        axes[0].tick_params(axis="x", rotation=30)
+
+    # Multimodal accuracy
+    acc_cols = [c for c in cross_cat_df.columns if c.endswith("_accuracy") and "disagree" not in c]
+    if acc_cols:
+        x = np.arange(len(cats))
+        width = 0.25
+        for i, col in enumerate(acc_cols):
+            label = col.replace("_accuracy", "").replace("_", " ").title()
+            axes[1].bar(x + i * width, cross_cat_df[col], width, label=label, color=COLORS[i])
+        axes[1].set_xticks(x + width)
+        axes[1].set_xticklabels(cats, rotation=30)
+        axes[1].set_ylabel("Accuracy")
+        axes[1].set_title("Model Accuracy by Category")
+        axes[1].legend()
+
+    fig.tight_layout()
+    save_fig(fig, "cross_category_comparison.png")

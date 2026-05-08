@@ -1,4 +1,4 @@
-"""Train text-only sentiment model: DistilBERT or TF-IDF + LogReg fallback."""
+"""Train text-only sentiment model: sentence-transformers, DistilBERT, or TF-IDF + LogReg."""
 
 import os
 import yaml
@@ -16,6 +16,60 @@ from tqdm import tqdm
 def load_config(config_path="config/config.yaml"):
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
+
+
+# ---------------------------------------------------------------------------
+# Sentence-Transformer + Logistic Regression (recommended CPU path)
+# ---------------------------------------------------------------------------
+
+def _encode_texts(texts, model_name="all-MiniLM-L6-v2", batch_size=128):
+    """Encode texts using a sentence-transformer model."""
+    from sentence_transformers import SentenceTransformer
+
+    model = SentenceTransformer(model_name)
+    embeddings = model.encode(
+        texts, batch_size=batch_size, show_progress_bar=True,
+        normalize_embeddings=True,
+    )
+    return embeddings
+
+
+def train_sbert_logreg(train_df, val_df, cfg, save_dir="models/text_only"):
+    os.makedirs(save_dir, exist_ok=True)
+    model_cfg = cfg["models"]["text_model"]
+    sbert_name = model_cfg.get("sbert_model", "all-MiniLM-L6-v2")
+
+    print(f"Encoding training texts with {sbert_name}...")
+    X_train = _encode_texts(train_df["review_text"].tolist(), sbert_name)
+    y_train = train_df["label"].values
+
+    clf = LogisticRegression(max_iter=1000, C=1.0, random_state=cfg["project"]["seed"])
+    clf.fit(X_train, y_train)
+
+    X_val = _encode_texts(val_df["review_text"].tolist(), sbert_name)
+    y_val = val_df["label"].values
+    val_preds = clf.predict(X_val)
+    val_acc = accuracy_score(y_val, val_preds)
+    print(f"Text-only (SBERT+LogReg) val accuracy: {val_acc:.4f}")
+
+    joblib.dump(clf, os.path.join(save_dir, "sbert_logreg_model.joblib"))
+    joblib.dump({"sbert_model": sbert_name}, os.path.join(save_dir, "sbert_config.joblib"))
+    print(f"Saved sentence-transformer text model to {save_dir}")
+
+    return clf
+
+
+def predict_sbert_logreg(df, save_dir="models/text_only"):
+    clf = joblib.load(os.path.join(save_dir, "sbert_logreg_model.joblib"))
+    sbert_cfg = joblib.load(os.path.join(save_dir, "sbert_config.joblib"))
+
+    X = _encode_texts(df["review_text"].tolist(), sbert_cfg["sbert_model"])
+    preds = clf.predict(X)
+    probs = clf.predict_proba(X)
+    confidence = np.max(probs, axis=1)
+    prob_positive = probs[:, 1]
+
+    return preds, prob_positive, confidence
 
 
 # ---------------------------------------------------------------------------

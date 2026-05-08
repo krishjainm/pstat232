@@ -6,8 +6,7 @@ sys.path.insert(0, ".")
 import pandas as pd
 import yaml
 from src.models.train_text_model import (
-    train_tfidf_logreg, train_distilbert,
-    predict_tfidf_logreg, predict_distilbert,
+    train_tfidf_logreg, train_distilbert, train_sbert_logreg,
 )
 
 
@@ -23,7 +22,10 @@ def main():
 
     model_type = cfg["models"]["text_model"]["type"]
 
-    if model_type == "distilbert":
+    if model_type == "sentence_transformer":
+        print("Training sentence-transformer + LogReg text model...")
+        train_sbert_logreg(train_df, val_df, cfg)
+    elif model_type == "distilbert":
         try:
             print("Training DistilBERT text model...")
             train_distilbert(train_df, val_df, cfg)
