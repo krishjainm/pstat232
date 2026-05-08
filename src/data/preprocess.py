@@ -133,6 +133,21 @@ def select_final_columns(df):
     return df[available].reset_index(drop=True)
 
 
+def balance_classes(df, seed=42):
+    """Downsample majority class to match minority class size."""
+    counts = df["label"].value_counts()
+    minority_n = counts.min()
+    majority_label = counts.idxmax()
+    minority_label = counts.idxmin()
+
+    majority_df = df[df["label"] == majority_label].sample(n=minority_n, random_state=seed)
+    minority_df = df[df["label"] == minority_label]
+    balanced = pd.concat([majority_df, minority_df]).sample(frac=1, random_state=seed).reset_index(drop=True)
+
+    print(f"Balanced classes: {len(balanced)} samples ({minority_n} per class)")
+    return balanced
+
+
 def preprocess_pipeline(config_path="config/config.yaml"):
     cfg = load_config(config_path)
     reviews_df, meta_df = load_raw_data()
@@ -142,7 +157,9 @@ def preprocess_pipeline(config_path="config/config.yaml"):
     reviews_df = build_metadata_features(reviews_df)
     reviews_df = select_final_columns(reviews_df)
 
-    # Fill remaining NaN in numeric metadata with median
+    if cfg["data"].get("balance_classes", False):
+        reviews_df = balance_classes(reviews_df, seed=cfg["project"]["seed"])
+
     meta_feats = [
         "product_average_rating", "product_rating_number",
         "product_price", "review_year"

@@ -96,7 +96,7 @@ def main():
         save_table(dom_sev_df, "modality_dominance_by_severity.csv")
 
     # Upgrade 3: Probability-based dominance
-    test_df_with_prob, prob_summary = compute_probability_dominance(test_df)
+    test_df, prob_summary = compute_probability_dominance(test_df)
     save_table(pd.DataFrame([prob_summary]), "probability_dominance_summary.csv")
 
     # Upgrade 3: Conflict-only dominance

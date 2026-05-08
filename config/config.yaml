@@ -15,6 +15,7 @@ data:
   positive_threshold: 4
   negative_threshold: 2
   drop_neutral: true
+  balance_classes: true
 
 splits:
   train_size: 0.70

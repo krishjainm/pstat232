@@ -30,10 +30,21 @@ def compute_confusion(y_true, y_pred):
     return confusion_matrix(y_true, y_pred)
 
 
+def compute_majority_baseline(y_true):
+    """Compute metrics for a majority-class baseline."""
+    majority_class = int(np.round(y_true.mean()))
+    y_pred = np.full_like(y_true, majority_class)
+    y_prob = np.full(len(y_true), y_true.mean() if majority_class == 1 else 1 - y_true.mean())
+
+    return compute_classification_metrics(y_true, y_pred, y_prob)
+
+
 def compute_all_model_metrics(df):
-    """Compute metrics for all three models from a prediction-augmented dataframe."""
+    """Compute metrics for all three models + majority baseline."""
     results = {}
     y_true = df["label"].values
+
+    results["majority_baseline"] = compute_majority_baseline(y_true)
 
     for name, pred_col, prob_col in [
         ("text_only", "text_pred", "text_prob_positive"),
