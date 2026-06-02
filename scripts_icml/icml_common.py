@@ -185,40 +185,63 @@ def build_canonical_pool(category, pool_size=20000, force=False):
         if col in df.columns:
             df[col] = df[col].fillna(df[col].median())
 
-    # Balance, then cap to pool_size (fixed master seed).
+    # Balance, then cap to pool_size (fixed master seed). Use explicit
+    # per-class sampling (robust across pandas versions).
     df = balance_classes(df, seed=MASTER_SEED)
     if len(df) > pool_size:
-        # stratified cap: keep pool_size/2 per class
         per = pool_size // 2
-        df = (df.groupby("label", group_keys=False)
-                .apply(lambda g: g.sample(n=min(per, len(g)), random_state=MASTER_SEED))
-                .sample(frac=1, random_state=MASTER_SEED)
-                .reset_index(drop=True))
+        parts = []
+        for lab in sorted(df["label"].unique()):
+            g = df[df["label"] == lab]
+            parts.append(g.sample(n=min(per, len(g)), random_state=MASTER_SEED))
+        df = pd.concat(parts).sample(frac=1, random_state=MASTER_SEED)
     df = df.reset_index(drop=True)
     df["uid"] = np.arange(len(df))
 
-    # Disagreement via pretrained sentiment model (Definition A).
-    print(f"[pool] scoring text sentiment on {len(df)} reviews (one-time)...")
-    labels, confs = compute_text_sentiment_fast(df["review_text"].tolist())
-    df["text_sentiment_label"] = labels
-    df["text_sentiment_confidence"] = confs
+    # --- Checkpoint A: sentiment (the most expensive step). Saved immediately
+    #     after scoring so a later crash never wastes the compute. ---
+    sent_ckpt = os.path.join(interim_dir(category), "sentiment_ckpt.parquet")
+    if os.path.exists(sent_ckpt):
+        prev = pd.read_parquet(sent_ckpt)
+        if len(prev) == len(df):
+            print(f"[pool] reusing sentiment checkpoint {sent_ckpt}")
+            df["text_sentiment_label"] = prev["text_sentiment_label"].values
+            df["text_sentiment_confidence"] = prev["text_sentiment_confidence"].values
+        else:
+            prev = None
+    else:
+        prev = None
+    if "text_sentiment_label" not in df.columns:
+        print(f"[pool] scoring text sentiment on {len(df)} reviews (one-time)...")
+        labels, confs = compute_text_sentiment_fast(df["review_text"].tolist())
+        df["text_sentiment_label"] = labels
+        df["text_sentiment_confidence"] = confs
+        df[["uid", "text_sentiment_label", "text_sentiment_confidence"]].to_parquet(
+            sent_ckpt, index=False)
+        print(f"[pool] saved sentiment checkpoint -> {sent_ckpt}")
+
     df = _assign_disagreement(df)
 
-    # SBERT embeddings (one-time).
-    print(f"[pool] encoding SBERT embeddings for {len(df)} reviews (one-time)...")
-    from sentence_transformers import SentenceTransformer
-    enc = SentenceTransformer("all-MiniLM-L6-v2")
-    emb = enc.encode(df["review_text"].tolist(), batch_size=128,
-                     show_progress_bar=True, normalize_embeddings=True)
-    np.save(spath, emb.astype(np.float32))
+    # --- Checkpoint B: SBERT embeddings ---
+    if os.path.exists(spath) and np.load(spath, mmap_mode="r").shape[0] == len(df):
+        print(f"[pool] reusing SBERT cache {spath}")
+    else:
+        print(f"[pool] encoding SBERT embeddings for {len(df)} reviews (one-time)...")
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        from sentence_transformers import SentenceTransformer
+        enc = SentenceTransformer("all-MiniLM-L6-v2")
+        emb = enc.encode(df["review_text"].tolist(), batch_size=128,
+                         show_progress_bar=True, normalize_embeddings=True)
+        np.save(spath, emb.astype(np.float32))
 
     df.to_parquet(ppath, index=False)
-    print(f"[pool] saved {ppath} ({df.shape}) and {spath} ({emb.shape})")
+    print(f"[pool] saved {ppath} ({df.shape})")
     print(df["disagreement_group"].value_counts())
     return df
 
 
-def compute_text_sentiment_fast(texts, char_cap=400, batch_size=64):
+def compute_text_sentiment_fast(texts, char_cap=300, batch_size=64):
     """Fast pretrained-sentiment proxy (Definition A).
 
     Long reviews dominate CPU cost; we truncate each review to the first
@@ -246,7 +269,7 @@ def compute_text_sentiment_fast(texts, char_cap=400, batch_size=64):
         model="distilbert-base-uncased-finetuned-sst-2-english",
         device=-1,
         truncation=True,
-        max_length=128,
+        max_length=96,
     )
     print("[sentiment] pipeline ready; scoring...", flush=True)
     capped = [(t[:char_cap] if isinstance(t, str) and len(t) > char_cap else (t or "."))
