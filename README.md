@@ -38,7 +38,7 @@ Multimodal models combine multiple sources of information (e.g., text and metada
 | Model | Input | Architecture |
 |-------|-------|-------------|
 | Text-only | Review text | Sentence-Transformer (`all-MiniLM-L6-v2`) + Logistic Regression |
-| Metadata-only | Structured features (7-d) | XGBoost (200 estimators) |
+| Metadata-only | Structured features (8-d) | XGBoost (200 estimators, max depth 6) |
 | Multimodal (Early) | Text + metadata (392-d) | 2-layer MLP (256→64→2) with ReLU + dropout |
 | Multimodal (Late) | Text + metadata | Separate MLPs, averaged logits |
 | Multimodal (Gated) | Text + metadata | Learned sigmoid gate over modality representations |
@@ -81,7 +81,8 @@ python scripts/run_all_categories.py            # Run across multiple product ca
 python scripts/run_experiments.py               # Multi-seed experiments
 
 # Or use Make
-make all                # Full pipeline
+make all                # Core pipeline (scripts 01-08)
+make extras             # Fusion comparison + disagreement-aware (scripts 09-10)
 make multi-category     # Cross-category comparison
 make multi-seed         # Multi-seed robustness
 make test               # Run unit tests
@@ -101,7 +102,7 @@ python -m pytest tests/ -v
 - **Tables** (`reports/tables/`): 20+ CSV files including main results, group results, bootstrap CIs, McNemar's tests, fusion comparison, calibration, modality dominance, temperature scaling, selective prediction, error taxonomy, case studies, and disagreement-aware comparison.
 - **Figures** (`reports/figures/`): 14 PNG figures including class distribution, agreement distribution, accuracy/F1 by group, calibration curves, modality dominance, probability dominance histogram, confidence analysis, confusion matrices, feature importance, calibration by group, and selective prediction curves.
 - **Models** (`models/`): Saved model checkpoints and artifacts for text, metadata, multimodal, and disagreement-aware models.
-- **Paper** (`paper/main.tex`): Full LaTeX paper (9 pages) with real results, bootstrap CIs, proposed method, and embedded figures.
+- **Paper** (`paper/main.tex`): Full LaTeX paper (10 pages) with real results, bootstrap CIs, proposed method, and embedded figures.
 
 ## Project Structure
 

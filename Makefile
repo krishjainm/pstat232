@@ -1,4 +1,5 @@
-.PHONY: all install download preprocess disagreement train evaluate figures paper clean test
+.PHONY: all install download preprocess disagreement train evaluate figures \
+        fusion disagree-aware extras paper clean test
 
 PYTHON ?= python
 
@@ -32,6 +33,16 @@ evaluate:
 
 figures:
 	$(PYTHON) scripts/08_generate_figures.py
+
+# Extra analyses (not part of `all`): regenerate fusion comparison and
+# disagreement-aware / selective-abstention tables used in the paper.
+fusion:
+	$(PYTHON) scripts/09_fusion_comparison.py
+
+disagree-aware:
+	$(PYTHON) scripts/10_disagreement_aware.py
+
+extras: fusion disagree-aware
 
 multi-category:
 	$(PYTHON) scripts/run_all_categories.py

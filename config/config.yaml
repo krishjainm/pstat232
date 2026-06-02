@@ -32,6 +32,7 @@ features:
     - verified_purchase
     - product_average_rating
     - product_rating_number
+    - product_price
     - review_year
 
 disagreement:
