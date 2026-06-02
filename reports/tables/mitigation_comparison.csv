@@ -1,0 +1,12 @@
+method,data_split,overall_acc,disagree_acc,strong_disagree_acc,overall_f1,disagree_f1,overall_auroc,overall_ece,disagree_ece,overall_brier,note
+Standard (w=1),Appliances (materialized split),0.8861,0.7909,0.7672,0.8873,0.8582,0.9532,0.0642,0.1822,0.0908,
+Fixed DA (w=2),Appliances (materialized split),0.8827,0.7828,0.7639,0.8835,0.853,0.9501,0.0665,0.1784,0.0932,
+Fixed DA (w=3),Appliances (materialized split),0.8797,0.7828,0.7639,0.8814,0.853,0.9499,0.0626,0.1722,0.0933,
+Fixed DA (w=5),Appliances (materialized split),0.8737,0.807,0.7869,0.8762,0.871,0.9462,0.0674,0.1622,0.0975,
+Fixed DA (w=8),Appliances (materialized split),0.8631,0.7962,0.777,0.8688,0.8648,0.9404,0.0741,0.1487,0.1052,
+Severity-aware (1/2/4/6),Appliances (materialized split),0.8716,0.815,0.8,0.8762,0.8787,0.9431,0.0732,0.1611,0.102,
+Focal (gamma=1),Appliances (materialized split),0.8844,0.7748,0.7574,0.8854,0.8462,0.9526,0.0328,0.1472,0.0852,
+Focal (gamma=2),Appliances (materialized split),0.8771,0.7748,0.7672,0.88,0.8484,0.9492,0.034,0.1519,0.0884,
+Focal(g=2)+DA(w=3),Appliances (materialized split),0.8788,0.7882,0.7738,0.8804,0.8571,0.9471,0.0311,0.1602,0.0898,
+Standard + global temp,Appliances (materialized split),0.8861,0.7909,0.7672,0.8873,0.8582,0.9532,0.0202,0.1585,0.0838,T=2.046; preds unchanged vs Standard
+Standard + groupwise temp,Appliances (materialized split),0.8861,0.7909,0.7672,0.8873,0.8582,0.9553,0.0313,0.1644,0.0841,"T_agree=1.520, T_dis=2.414"
