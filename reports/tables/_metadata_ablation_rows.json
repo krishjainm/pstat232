@@ -1,0 +1,26 @@
+[
+  {
+    "ablation": "metadata_feature_set",
+    "variant": "full_8_features",
+    "n_features": 8,
+    "cv_accuracy_mean": 0.6602,
+    "cv_accuracy_std": 0.0206,
+    "note": "5-fold stratified CV on All_Beauty test partition (audit)"
+  },
+  {
+    "ablation": "metadata_feature_set",
+    "variant": "no_product_average_rating",
+    "n_features": 7,
+    "cv_accuracy_mean": 0.5506,
+    "cv_accuracy_std": 0.0165,
+    "note": "5-fold stratified CV on All_Beauty test partition (audit)"
+  },
+  {
+    "ablation": "metadata_feature_set",
+    "variant": "no_product_level_features",
+    "n_features": 5,
+    "cv_accuracy_mean": 0.5464,
+    "cv_accuracy_std": 0.025,
+    "note": "5-fold stratified CV on All_Beauty test partition (audit)"
+  }
+]
