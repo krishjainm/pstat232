@@ -86,8 +86,15 @@ def sbert_path(category):
 # ---------------------------------------------------------------------------
 # Download
 # ---------------------------------------------------------------------------
-def download_category(category, max_raw=160000, seed=MASTER_SEED):
-    """Download reviews + metadata for a category, subsample reviews to max_raw."""
+def download_category(category, max_raw=160000, seed=MASTER_SEED,
+                      max_read_rows=500000):
+    """Download reviews + metadata for a category, subsample reviews to max_raw.
+
+    For very large categories (multi-GB review files), reading the entire file
+    is infeasible on modest hardware; we stop after `max_read_rows` rows and
+    subsample from those. This introduces file-order bias for huge categories,
+    which is documented in the Phase-2 report.
+    """
     from huggingface_hub import hf_hub_download
 
     rdir = raw_dir(category)
@@ -104,14 +111,19 @@ def download_category(category, max_raw=160000, seed=MASTER_SEED):
         filename=f"raw/review_categories/{category}.jsonl",
         repo_type="dataset",
     )
-    # Chunked read so very large files do not blow up memory; reservoir-cap.
+    # Chunked read so very large files do not blow up memory; cap rows read.
     chunks = []
     total = 0
+    capped = False
     for chunk in pd.read_json(rev_file, lines=True, chunksize=100000):
         chunks.append(chunk)
         total += len(chunk)
+        if total >= max_read_rows:
+            capped = True
+            break
     reviews = pd.concat(chunks, ignore_index=True)
-    print(f"[download] {category}: {len(reviews)} raw reviews")
+    print(f"[download] {category}: read {len(reviews)} rows"
+          + (f" (capped at {max_read_rows})" if capped else ""))
     if len(reviews) > max_raw:
         reviews = reviews.sample(n=max_raw, random_state=seed).reset_index(drop=True)
         print(f"[download] subsampled to {len(reviews)}")
@@ -124,7 +136,17 @@ def download_category(category, max_raw=160000, seed=MASTER_SEED):
             filename=f"raw/meta_categories/meta_{category}.jsonl",
             repo_type="dataset",
         )
-        meta = pd.read_json(meta_file, lines=True)
+        # Cap metadata rows read so multi-GB meta files do not OOM. Products
+        # beyond the cap get NaN metadata (median-filled later); documented.
+        meta_chunks, mtot = [], 0
+        for ch in pd.read_json(meta_file, lines=True, chunksize=100000):
+            keep = [c for c in ["parent_asin", "average_rating", "rating_number",
+                                "price", "main_category"] if c in ch.columns]
+            meta_chunks.append(ch[keep])
+            mtot += len(ch)
+            if mtot >= max_read_rows:
+                break
+        meta = pd.concat(meta_chunks, ignore_index=True)
         meta.to_parquet(meta_out, index=False)
         print(f"[download] metadata rows: {len(meta)}")
     except Exception as e:  # pragma: no cover
