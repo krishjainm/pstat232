@@ -1,0 +1,9 @@
+ablation,variant,data,metric_type,accuracy,disagree_acc,note
+metadata_feature_set,full_8_features,All_Beauty test (5-fold CV),cv_accuracy,0.6602,,8 feats; std=0.0206
+metadata_feature_set,no_product_average_rating,All_Beauty test (5-fold CV),cv_accuracy,0.5506,,7 feats; std=0.0165
+metadata_feature_set,no_product_level_features,All_Beauty test (5-fold CV),cv_accuracy,0.5464,,5 feats; std=0.025
+text_embedding,sbert_minilm_logreg,Appliances test,test_accuracy,0.8699,0.681,all-MiniLM-L6-v2 embeddings + logistic regression
+text_embedding,tfidf_logreg,Appliances test,test_accuracy,0.8801,0.6836,"TF-IDF (1,2)-grams + logistic regression"
+fusion_architecture,early,All_Beauty test,test_accuracy,0.8881,0.6414,from fusion_comparison_results.csv
+fusion_architecture,late,All_Beauty test,test_accuracy,0.8891,0.6501,from fusion_comparison_results.csv
+fusion_architecture,gated,All_Beauty test,test_accuracy,0.8833,0.6297,from fusion_comparison_results.csv

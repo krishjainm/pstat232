@@ -24,6 +24,15 @@ Multimodal models combine multiple sources of information (e.g., text and metada
 - All three fusion architectures (early, late, gated) perform comparably (88.3–88.9%), suggesting the problem is paradigmatic, not architectural.
 - Disagreement induces severe miscalibration: ECE of 0.219 vs. 0.017 for agreement cases (13× increase). Temperature scaling fails to close this gap.
 
+## Reliability Caveats (read before citing the numbers)
+
+These follow from the research-upgrade audit (`reports/research_upgrade_baseline_check.md`, `reports/leakage_audit.md`, `reports/neurlips_icml_upgrade_summary.md`) and are reported honestly:
+
+- **Fusion's advantage concentrates in the agreement regime.** On the *strong*-disagreement subset, multimodal is **not** statistically better than text-only (McNemar p = 0.136) or metadata-only (p = 0.53). The headline accuracy gain is real overall but erodes exactly where modalities conflict.
+- **Metadata leakage.** The metadata model's skill is largely driven by `product_average_rating`, a product-level aggregate that partially encodes the label: removing it drops metadata CV accuracy from 0.66 → 0.55. The `no_product_average_rating` configuration is the more conservative setting.
+- **"Disagreement" is a proxy.** It is defined via a pretrained sentiment model vs. the rating-derived label, so the disagreement subset is enriched for hard/mislabeled reviews (see qualitative case 4).
+- **Mitigations help modestly.** Severity-aware reweighting gives the best disagreement-accuracy gains; focal loss / temperature scaling help calibration but not disagreement accuracy. No method fixes both, and multi-seed runs show gains are comparable to training variance. The extended mitigation and multi-seed studies were run on the Appliances split (the materialized data on hand).
+
 ## Dataset
 
 **Amazon Reviews 2023** (McAuley Lab) — `All_Beauty` category (configurable to other categories).
@@ -80,6 +89,15 @@ python scripts/10_disagreement_aware.py         # Disagreement-aware training + 
 python scripts/run_all_categories.py            # Run across multiple product categories
 python scripts/run_experiments.py               # Multi-seed experiments
 
+# Research-upgrade analyses (rigor / generalization / honesty checks)
+python scripts/upgrade_extended_stats.py        # Paired-bootstrap + McNemar on key comparisons
+python scripts/upgrade_qualitative.py           # 6 representative qualitative case studies
+python scripts/upgrade_leakage_audit.py         # Metadata leakage audit + correlations
+python scripts/upgrade_ablation.py              # Metadata / text-encoder / fusion ablations
+python scripts/upgrade_cross_category_figs.py   # Cross-category figures from results CSV
+python scripts/upgrade_mitigation.py            # Mitigation comparison (needs SBERT; trains variants)
+python scripts/upgrade_multiseed.py             # Multi-seed robustness (needs cached SBERT features)
+
 # Or use Make
 make all                # Core pipeline (scripts 01-08)
 make extras             # Fusion comparison + disagreement-aware (scripts 09-10)
@@ -99,10 +117,11 @@ python -m pytest tests/ -v
 
 ## Outputs
 
-- **Tables** (`reports/tables/`): 20+ CSV files including main results, group results, bootstrap CIs, McNemar's tests, fusion comparison, calibration, modality dominance, temperature scaling, selective prediction, error taxonomy, case studies, and disagreement-aware comparison.
-- **Figures** (`reports/figures/`): 14 PNG figures including class distribution, agreement distribution, accuracy/F1 by group, calibration curves, modality dominance, probability dominance histogram, confidence analysis, confusion matrices, feature importance, calibration by group, and selective prediction curves.
+- **Tables** (`reports/tables/`): main/group results, bootstrap CIs, McNemar's tests, fusion comparison, calibration, modality dominance, temperature scaling, selective prediction, error taxonomy, case studies, disagreement-aware comparison, plus research-upgrade tables: `statistical_tests_extended.csv`, `mitigation_comparison.csv`, `ablation_results.csv`, `metadata_correlations.csv`, `multiseed_results.csv`, `qualitative_case_studies.csv`.
+- **Figures** (`reports/figures/`): the original 14 PNGs plus cross-category (`cross_category_accuracy/disagreement_gap/calibration_gap.png`), mitigation (`mitigation_tradeoff/disagreement_accuracy/calibration.png`), `ablation_summary.png`, `multiseed_error_bars.png`, and `metadata_feature_importance_no_leakage.png`.
 - **Models** (`models/`): Saved model checkpoints and artifacts for text, metadata, multimodal, and disagreement-aware models.
-- **Paper** (`paper/main.tex`): Full LaTeX paper (10 pages) with real results, bootstrap CIs, proposed method, and embedded figures.
+- **Paper** (`paper/main.tex`): Full LaTeX paper (12 pages) with cross-category generalization, mitigation comparison, ablation + leakage audit, and a strengthened limitations section.
+- **Reports** (`reports/`): `verification_report.md`, `research_upgrade_baseline_check.md`, `leakage_audit.md`, `qualitative_case_studies.md`, `neurlips_icml_upgrade_summary.md`.
 
 ## Project Structure
 

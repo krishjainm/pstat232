@@ -118,6 +118,10 @@ def run_single_category(category, base_cfg):
             summary[f"{model_name}_f1"] = metrics["f1"]
             summary[f"{model_name}_auroc"] = metrics["auroc"]
 
+        from src.evaluation.metrics import compute_classification_metrics
+        from src.evaluation.calibration import expected_calibration_error
+        from sklearn.metrics import accuracy_score, brier_score_loss
+
         if disagree_mask.sum() > 0:
             disagree_subset = test_df[disagree_mask]
             for mn, pc, pp in [
@@ -125,7 +129,6 @@ def run_single_category(category, base_cfg):
                 ("metadata_only", "meta_pred", "meta_prob_positive"),
                 ("multimodal", "mm_pred", "mm_prob_positive"),
             ]:
-                from src.evaluation.metrics import compute_classification_metrics
                 d_metrics = compute_classification_metrics(
                     disagree_subset["label"].values,
                     disagree_subset[pc].values,
@@ -133,6 +136,28 @@ def run_single_category(category, base_cfg):
                 )
                 summary[f"{mn}_disagree_acc"] = d_metrics["accuracy"]
                 summary[f"{mn}_disagree_f1"] = d_metrics["f1"]
+
+        # Per-category calibration (ECE/Brier overall + group-conditional) and
+        # strong-disagreement accuracy, for the richer cross-category table.
+        strong_mask = (test_df["disagreement_group"] == "strong_disagreement").values
+        agree_mask = (test_df["agreement_status"] == "agreement").values
+        for mn, pc, pp in [
+            ("text_only", "text_pred", "text_prob_positive"),
+            ("metadata_only", "meta_pred", "meta_prob_positive"),
+            ("multimodal", "mm_pred", "mm_prob_positive"),
+        ]:
+            y = test_df["label"].values
+            pr = test_df[pp].values
+            pd_ = test_df[pc].values
+            ece_overall, _, _, _ = expected_calibration_error(y, pr, 10)
+            summary[f"{mn}_ece"] = ece_overall
+            summary[f"{mn}_brier"] = brier_score_loss(y, pr)
+            if agree_mask.sum() > 0:
+                summary[f"{mn}_ece_agreement"], _, _, _ = expected_calibration_error(y[agree_mask], pr[agree_mask], 10)
+            if disagree_mask.sum() > 0:
+                summary[f"{mn}_ece_disagreement"], _, _, _ = expected_calibration_error(y[disagree_mask.values], pr[disagree_mask.values], 10)
+            if strong_mask.sum() > 0:
+                summary[f"{mn}_strong_disagree_acc"] = accuracy_score(y[strong_mask], pd_[strong_mask])
 
         # Text dominance in true-conflict cases
         conflict = test_df[test_df["text_pred"] != test_df["meta_pred"]]

@@ -29,7 +29,7 @@ Multimodal learning integrates diverse data sources under the assumption that co
 That modalities can disagree, and that fusion models can over-rely on one modality, is already known; our contribution is a \emph{systematic, statistically grounded characterization} of \emph{when} and \emph{how} this conflict degrades a text--metadata sentiment classifier, together with a simple mitigation.
 Using the Amazon Reviews 2023 dataset across three product categories (All Beauty, Digital Music, Appliances), we build text (sentence-transformer), metadata (XGBoost), and three fusion models (early, late, gated), then evaluate them on agreement and graded-disagreement subsets with bootstrap 95\% confidence intervals and McNemar's tests.
 Our analysis shows that: (1) fusion raises average accuracy (88.8\% vs.\ 86.8\% text-only) but drops to 64.1\% on disagreement cases; (2) the fusion model resolves true text--metadata conflicts by following text 82.2\% of the time; (3) disagreement induces a 13$\times$ calibration gap (ECE 0.219 vs.\ 0.017) that a single global temperature cannot fix; and (4) early, late, and gated fusion behave near-identically, indicating the failure is not specific to a single fusion architecture.
-Finally, \textbf{disagreement-aware loss reweighting} improves disagreement accuracy by 3.2~pp and F1 by 4.3~pp for a 1.5~pp overall cost, showing the degradation is partially mitigable without changing the architecture.
+Finally, we compare simple mitigations: \textbf{disagreement-aware loss reweighting} improves disagreement accuracy by up to 3.2~pp (F1 by 4.3~pp) for a small overall cost, while focal loss and temperature scaling improve calibration but not disagreement accuracy---no single intervention fixes both, and the gains are modest relative to training-seed variance.
 \end{abstract}
 
 \section{Introduction}
@@ -48,8 +48,8 @@ Concretely, this paper makes the following contributions:
   \item \textbf{Graded disagreement evaluation.} We operationalize text--rating conflict into four severity subgroups (agreement, weak/medium/strong disagreement) and report performance per subgroup with bootstrap 95\% CIs and McNemar's tests, making the agreement$\to$disagreement degradation and its uncertainty explicit.
   \item \textbf{Dominance quantification.} We measure modality reliance with three complementary lenses---label-based, probability-based, and true-conflict dominance---showing fusion consistently follows text under conflict (68--82\% across categories).
   \item \textbf{Group-conditional calibration.} We show a 13$\times$ ECE gap between agreement and disagreement and that a single global temperature cannot close it, motivating modality-conditioned calibration.
-  \item \textbf{A simple, effective mitigation.} We show that disagreement-aware loss reweighting improves disagreement F1 by 4.3~pp at modest overall cost, with no architectural change, establishing that the degradation is partially addressable.
-  \item \textbf{Robustness checks.} We replicate the analysis across three product categories and three fusion architectures, and provide a heuristic error taxonomy isolating mixed sentiment, sarcasm, and short reviews as recurring failure drivers.
+  \item \textbf{An honest comparison of simple mitigations.} We compare disagreement reweighting (fixed and severity-aware), focal loss, and post-hoc temperature scaling, reporting the full accuracy--calibration trade-off rather than a single best number. Reweighting buys disagreement accuracy at small overall cost; focal loss and temperature scaling improve calibration but not disagreement accuracy; no method improves both.
+  \item \textbf{Robustness and a leakage audit.} We replicate across three product categories and three fusion architectures, vary training seeds, ablate the text encoder, and audit metadata leakage---finding that the metadata model's skill is largely driven by the product-level \texttt{product\_average\_rating} feature, which we therefore treat cautiously.
 \end{enumerate}
 
 \section{Related Work}
@@ -285,6 +285,7 @@ Temperature scaling provides negligible improvement on disagreement (0.219 $\to$
 
 On the overall test set, all pairwise differences are significant (Table~\ref{tab:mcnemar}).
 On the disagreement subset, multimodal vs.\ text-only is significant ($p = 0.031$), but metadata vs.\ multimodal ($p = 0.456$) and text vs.\ metadata ($p = 0.568$) are not---model differences largely vanish under conflict.
+Restricting further to the \emph{strong}-disagreement subset ($n = 266$), even the multimodal-vs.-text-only advantage is no longer significant (continuity-corrected McNemar $\chi^2 = 2.22$, $p = 0.136$; paired bootstrap 95\% CI on the accuracy gap $[-0.090, +0.008]$), and multimodal vs.\ metadata-only is likewise indistinguishable ($p = 0.534$). In our setting, the apparent benefit of fusion thus concentrates in the agreement regime and erodes precisely where modalities conflict most. We report these extended paired comparisons in \texttt{statistical\_tests\_extended.csv}.
 
 \begin{table}[htbp]
 \centering
@@ -323,6 +324,75 @@ This demonstrates that the degradation under conflict is partially mitigable thr
 Standard           & .888 & .886 & .919 & .916 & .641 & .685 \\
 DA ($w = 3$)       & .880 & .880 & .907 & .905 & .662 & .714 \\
 DA ($w = 5$)       & .873 & .875 & .898 & .897 & \textbf{.673} & \textbf{.728} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Comparing Mitigation Strategies}
+
+To understand the space of simple interventions---and to test whether the mitigation transfers beyond a single domain---we compare four families on a second category (Appliances), using identical features and the early-fusion backbone (Table~\ref{tab:mitigation}): fixed disagreement reweighting ($w\in\{2,3,5,8\}$), severity-aware reweighting (weights $1/2/4/6$ for agreement/weak/medium/strong), focal loss ($\gamma\in\{1,2\}$, optionally combined with reweighting), and post-hoc temperature scaling (global vs.\ group-wise).
+We deliberately report the full trade-off rather than selecting a single ``winner.''
+We observe a clear division of labor: \textbf{reweighting methods} (especially severity-aware) buy disagreement and strong-disagreement \emph{accuracy} at a small overall-accuracy cost but do not improve calibration, whereas \textbf{focal loss and temperature scaling} substantially improve \emph{calibration} (overall ECE) but leave disagreement accuracy---and the high disagreement-subset ECE---essentially unchanged.
+No single method improves accuracy and calibration simultaneously.
+We also note honestly that on this category the smallest fixed weights ($w=2,3$) did \emph{not} help disagreement accuracy, unlike the All Beauty result above; the effective intervention here is severity-aware weighting.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Mitigation comparison on the Appliances split (early fusion). Accuracy-oriented vs.\ calibration-oriented methods trade off; temperature scaling does not change predictions (hence identical accuracy to Standard).}
+\label{tab:mitigation}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Method} & \textbf{Overall} & \textbf{Disagree} & \textbf{Strong} & \textbf{Overall} & \textbf{Disagree} \\
+ & \textbf{Acc.} & \textbf{Acc.} & \textbf{Acc.} & \textbf{ECE} & \textbf{ECE} \\
+\midrule
+Standard ($w{=}1$)          & .886 & .791 & .767 & .064 & .182 \\
+Fixed DA ($w{=}5$)          & .874 & .807 & .787 & .067 & .162 \\
+Severity-aware ($1/2/4/6$)  & .872 & \textbf{.815} & \textbf{.800} & .073 & .161 \\
+Focal ($\gamma{=}2$)        & .877 & .775 & .767 & \textbf{.034} & .152 \\
+Standard $+$ global temp    & .886 & .791 & .767 & \textbf{.020} & .159 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Robustness across seeds.}
+Re-training the fusion model under three seeds (42/123/456) on the Appliances split (varying initialization and minibatch order, with the split and features held fixed), severity/reweighting gains are real but modest relative to training noise: Standard reaches $.776\pm.016$ disagreement accuracy vs.\ $.790\pm.015$ for DA ($w{=}5$), and $.752\pm.021$ vs.\ $.773\pm.013$ on strong disagreement.
+We therefore frame the mitigations as a favorable but small shift along the overall--disagreement trade-off, not as a decisive fix (full numbers in \texttt{multiseed\_results.csv}).
+
+\subsection{Ablation and Leakage Audit}
+
+\paragraph{Is the metadata model leaking the label?}
+The strongest metadata feature, \texttt{product\_average\_rating}, is a \emph{product-level} aggregate of ratings and is correlated with the per-review label (point-biserial $r = 0.38$ on All Beauty).
+A 5-fold cross-validation audit on the All Beauty test partition shows it carries most of the metadata model's signal: metadata accuracy falls from $.66$ (eight features) to $.55$ when \texttt{product\_average\_rating} is removed, and to $.55$ when all product-level features are removed (Table~\ref{tab:ablation}).
+We flag this as a meaningful leakage risk and designate the \emph{no-\texttt{product\_average\_rating}} configuration as the more conservative metadata setting.
+Crucially, our central disagreement claims concern \emph{multimodal vs.\ text} behavior under conflict and the dominance of text, neither of which depends on this feature.
+
+\paragraph{Text encoder and fusion architecture.}
+On the Appliances split, TF--IDF + logistic regression is competitive with (indeed marginally above) sentence-transformer embeddings for text-only accuracy ($.880$ vs.\ $.870$), suggesting that for this task the disagreement phenomenon is not an artifact of the specific text encoder.
+As reported earlier (Table~\ref{tab:fusion}), early/late/gated fusion are within $0.6$~pp of one another.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Ablations (each block uses the data noted; values are not directly comparable across blocks). Metadata block is 5-fold CV accuracy on the All Beauty test partition (leakage audit); text and fusion blocks are test accuracy.}
+\label{tab:ablation}
+\begin{tabular}{llc}
+\toprule
+\textbf{Ablation} & \textbf{Variant} & \textbf{Accuracy} \\
+\midrule
+\multirow{3}{*}{Metadata feature set (CV)}
+  & Full (8 features)                 & .660 \\
+  & $-$\texttt{product\_average\_rating}      & .551 \\
+  & $-$ all product-level features    & .546 \\
+\midrule
+\multirow{2}{*}{Text encoder (Appliances)}
+  & SBERT (MiniLM) $+$ LogReg         & .870 \\
+  & TF--IDF $+$ LogReg                & .880 \\
+\midrule
+\multirow{3}{*}{Fusion (All Beauty)}
+  & Early                             & .888 \\
+  & Late                              & .889 \\
+  & Gated                             & .883 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -392,9 +462,10 @@ On strong disagreement, the multimodal model can even underperform metadata-only
 Early, late, and gated fusion achieve 88.3--88.9\% accuracy with nearly identical disagreement performance, and all three learn similar text-dominant strategies.
 Within the standard fusion designs we test, this suggests effort is better spent on conflict-aware training objectives than on swapping among these architectures.
 
-\paragraph{Disagreement-Aware Training Works.}
-The 3.2~pp improvement in disagreement accuracy from simple loss reweighting ($w=5$) demonstrates that the problem is partially mitigable.
-The overall--disagreement trade-off (1.5~pp overall cost for 3.2~pp disagreement gain) is favorable in high-stakes applications where reliability under conflict matters more than average-case performance.
+\paragraph{Mitigation Helps, but Modestly.}
+Disagreement-aware reweighting shifts the model along the overall--disagreement trade-off in a favorable direction (e.g.\ $+3.2$~pp disagreement accuracy on All Beauty for a $1.5$~pp overall cost; severity-aware weighting gives the largest disagreement gains on Appliances).
+However, our multi-seed runs show these gains are modest relative to training noise, and our method comparison shows that accuracy-oriented and calibration-oriented interventions address different failures: reweighting helps disagreement \emph{accuracy} while focal loss / temperature scaling help \emph{calibration}, with neither closing the disagreement-subset ECE gap.
+We therefore present these as partial, complementary mitigations rather than a solution---reliability under conflict remains an open problem.
 
 \paragraph{Cross-Category Consistency.}
 The replication across three product categories (All Beauty, Digital Music, Appliances) strengthens our claims.
@@ -422,6 +493,8 @@ We recommend:
   \item \textbf{Heuristic taxonomy.} The error taxonomy uses keyword/pattern heuristics with a large ``other'' bucket (46\%); manual annotation would be needed to make its category rates authoritative.
   \item \textbf{Train-time labels required.} Disagreement-aware training needs disagreement labels during training; we do not address detecting conflict at inference time on unseen distributions.
   \item \textbf{Incomplete category sweep.} One attempted category (Video Games) failed due to a metadata parsing issue, so cross-category claims rest on three of four categories.
+  \item \textbf{Metadata leakage.} The metadata model's modest skill is largely attributable to \texttt{product\_average\_rating}, a product-level aggregate that partially encodes the target (removing it drops metadata CV accuracy from $.66$ to $.55$). We treat the no-\texttt{product\_average\_rating} setting as the conservative one; ``metadata-only'' difficulty should be read with this caveat.
+  \item \textbf{Mitigation evidence is partial.} The extended mitigation comparison and multi-seed robustness study were run on the Appliances split (the materialized data on hand); gains there are modest relative to training-seed variance, and we vary only training stochasticity (not the data split). A full multi-seed, multi-category mitigation study remains future work.
 \end{itemize}
 
 \section{Conclusion}
@@ -430,7 +503,7 @@ We have shown that multimodal sentiment classifiers exhibit systematic failure m
 Across three product categories (All Beauty, Digital Music, Appliances), the multimodal fusion model achieves 88.8--93.1\% overall accuracy but drops to 64.1--74.5\% on disagreement cases---a consistent 19--25~pp degradation.
 Text dominance ranges from 68--82\%, all three fusion architectures perform comparably, and standard calibration fails to address the 13$\times$ ECE gap between agreement and disagreement subgroups.
 
-Crucially, we demonstrate that disagreement-aware loss reweighting improves disagreement F1 by 4.3~pp, showing these failures are partially mitigable.
+We further show that simple interventions partially mitigate the problem---disagreement-aware reweighting improves disagreement F1 by up to 4.3~pp, and severity-aware weighting gives the largest disagreement-accuracy gains---while our method comparison and multi-seed runs make clear these gains are modest and that no single intervention fixes both accuracy and calibration under conflict.
 Future directions include:
 (1) modality dropout and stochastic gating;
 (2) uncertainty-based fusion with per-sample reliability estimates;
