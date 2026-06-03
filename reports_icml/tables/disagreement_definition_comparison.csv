@@ -1,0 +1,16 @@
+definition,n_flagged,prevalence,multimodal_acc_on_flagged,multimodal_acc_on_unflagged
+A_sentiment_vs_label,2317,0.1158,0.6383,0.9123
+B_cross_model,8467,0.4234,0.859,0.8964
+C_highconf_text_contradiction,267,0.0134,0.0075,0.8924
+
+# Pairwise Jaccard overlap
+,A_sentiment_vs_label,B_cross_model,C_highconf_text_contradiction
+A_sentiment_vs_label,1.0,0.1098,0.0678
+B_cross_model,0.1098,1.0,0.0139
+C_highconf_text_contradiction,0.0678,0.0139,1.0
+
+# Pairwise intersection counts
+,A_sentiment_vs_label,B_cross_model,C_highconf_text_contradiction
+A_sentiment_vs_label,2317.0,1067.0,164.0
+B_cross_model,1067.0,8467.0,120.0
+C_highconf_text_contradiction,164.0,120.0,267.0
