@@ -353,9 +353,28 @@ def split_id(category, seed):
 # Metadata scaling helpers (per split, fit on train only)
 # ---------------------------------------------------------------------------
 def scale_meta(train_df, other_dfs, feature_cols):
+    """Fit StandardScaler on train metadata; robust to residual NaNs.
+
+    Some categories have a fully-missing metadata column (e.g. price or
+    review_year), whose median is itself NaN, so median-fill leaves NaNs.
+    We impute remaining NaNs with the train-column mean (or 0 if a column is
+    entirely NaN) before scaling.
+    """
     from sklearn.preprocessing import StandardScaler
-    sc = StandardScaler().fit(train_df[feature_cols].values)
-    return [sc.transform(d[feature_cols].values) for d in other_dfs]
+
+    Xtr = train_df[feature_cols].to_numpy(dtype=float)
+    col_means = np.nanmean(Xtr, axis=0)
+    col_means = np.where(np.isfinite(col_means), col_means, 0.0)
+
+    def _impute(df):
+        X = df[feature_cols].to_numpy(dtype=float)
+        idx = np.where(~np.isfinite(X))
+        if idx[0].size:
+            X[idx] = np.take(col_means, idx[1])
+        return X
+
+    sc = StandardScaler().fit(_impute(train_df))
+    return [sc.transform(_impute(d)) for d in other_dfs]
 
 
 # ---------------------------------------------------------------------------
