@@ -45,6 +45,14 @@ CATEGORY_POOLS = [
 MAIN_MODELS = ["text_only", "metadata_lc", "early_fusion_lc", "disagree_aware_lc"]
 APPENDIX_MODELS = ["early_fusion_full"]
 
+# Caption appended to every cross-category figure to make coverage explicit.
+MULTICAT_NOTE = (
+    "Cross-category models: text-only, metadata-LC, early-fusion-LC, and "
+    "disagreement-aware reweighting. UGCA-Fusion is evaluated separately on the "
+    "canonical All_Beauty 5-seed benchmark and is NOT included in the "
+    "cross-category figures to avoid mixing complete and incomplete category "
+    "coverage.")
+
 
 def run_seed_lean(pool, emb, seed, category):
     tr, va, te = C.make_split(pool, seed)
@@ -135,6 +143,8 @@ def fig_disagreement_gap(summary, categories, out):
     ax.set_title("Early fusion (leakage-controlled): agreement vs disagreement accuracy\n"
                  "across categories (mean +/- std, seeds 42/123/456)")
     ax.legend(); ax.grid(axis="y", alpha=0.3)
+    fig.text(0.5, -0.06, MULTICAT_NOTE, ha="center", va="top", fontsize=6.5,
+             style="italic", wrap=True)
     fig.tight_layout(); fig.savefig(out, dpi=150, bbox_inches="tight"); plt.close(fig)
     print(f"[fig] {out}")
 
@@ -157,6 +167,8 @@ def fig_calibration_gap(summary, categories, out):
     ax.set_ylabel("calibration gap (disagree ECE - agree ECE)")
     ax.set_title("Calibration gap under conflict across categories")
     ax.legend(); ax.grid(axis="y", alpha=0.3)
+    fig.text(0.5, -0.06, MULTICAT_NOTE, ha="center", va="top", fontsize=6.5,
+             style="italic", wrap=True)
     fig.tight_layout(); fig.savefig(out, dpi=150, bbox_inches="tight"); plt.close(fig)
     print(f"[fig] {out}")
 
@@ -179,6 +191,8 @@ def fig_mitigation_effect(summary, categories, out):
     ax.set_ylabel("disagreement accuracy"); ax.set_ylim(0, 1)
     ax.set_title("Disagreement-aware reweighting effect on disagreement accuracy")
     ax.legend(); ax.grid(axis="y", alpha=0.3)
+    fig.text(0.5, -0.06, MULTICAT_NOTE, ha="center", va="top", fontsize=6.5,
+             style="italic", wrap=True)
     fig.tight_layout(); fig.savefig(out, dpi=150, bbox_inches="tight"); plt.close(fig)
     print(f"[fig] {out}")
 

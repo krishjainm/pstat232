@@ -7,7 +7,9 @@
 - **Main setting:** leakage-controlled metadata (drops `product_average_rating`, `product_rating_number`). Full-feature early fusion (`early_fusion_full`) is reported only as a secondary/appendix row.
 - **Pool sizes:** All_Beauty reuses the Phase-1 pool (20k); the other four use 12k balanced pools (capped by available negatives). Because Phase 2 tests whether a *within-category relative pattern* replicates, the differing pool sizes are not a confound for the gap/mitigation claims; they are documented for transparency.
 - **Large categories:** Video_Games review and metadata JSONL reads are capped at 500k rows (file-order subsample) to remain feasible on CPU; Appliances reuses the already-materialized 50k subsample. Documented as a limitation.
-- **Models:** text_only, metadata_lc, early_fusion_lc, disagree_aware_lc (main); early_fusion_full (appendix). UGCA-Fusion (Phase 4) will be added to this grid once implemented.
+- **Models:** text_only, metadata_lc, early_fusion_lc, disagree_aware_lc (main); early_fusion_full (appendix).
+
+> **UGCA-Fusion coverage note.** Cross-category figures include text-only, metadata-LC, early-fusion-LC, and disagreement-aware reweighting. **UGCA-Fusion is evaluated separately on the canonical All_Beauty 5-seed benchmark and is NOT included in the cross-category figures** to avoid mixing complete and incomplete category coverage. Partial UGCA results will only be added to these figures once UGCA is run for all categories and all seeds. The All_Beauty UGCA results and figures (`ugca_vs_baselines.png`, `ugca_ablation.png`, `conflict_detector_auc.png`) are clearly labeled "All_Beauty only".
 
 Outputs: `multicategory_multiseed_results.csv` (75 rows = 5×5×3), `multicategory_summary.csv`, and figures `multicategory_disagreement_gap.png`, `multicategory_calibration_gap.png`, `multicategory_mitigation_effect.png`.
 

@@ -183,8 +183,8 @@ def fig_conflict_auc(abl_df, out):
     ax.set_xticks(x); ax.set_xticklabels([f"seed {s}" for s in sub["seed"]])
     ax.set_ylabel("AUROC(disagreement label, c_hat)")
     ax.set_ylim(0, 1)
-    ax.set_title("UGCA conflict detector: predicting proxy disagreement\n"
-                 "at inference WITHOUT the true class label")
+    ax.set_title("UGCA conflict detector (All_Beauty only): predicting proxy\n"
+                 "disagreement at inference WITHOUT the true class label")
     ax.legend(); ax.grid(axis="y", alpha=0.3)
     fig.tight_layout(); fig.savefig(out, dpi=150, bbox_inches="tight"); plt.close(fig)
     print(f"[fig] {out}")

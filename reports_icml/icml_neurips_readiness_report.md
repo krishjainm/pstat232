@@ -21,6 +21,18 @@ the original `reports/` and `paper/` are untouched. Every run is logged in
 | 9 | ICML/NeurIPS paper (`paper_icml/main.tex` + `references.bib`, compiles to 6-page PDF) | Done & verified |
 | 10 | This report | Done |
 
+### Figure coverage note
+Cross-category figures (`multicategory_disagreement_gap.png`,
+`multicategory_calibration_gap.png`, `multicategory_mitigation_effect.png`)
+include **text-only, metadata-LC, early-fusion-LC, and disagreement-aware
+reweighting only**. UGCA-Fusion is benchmarked separately on the canonical
+All_Beauty 5-seed run and is **not** mixed into the cross-category figures
+(to avoid combining complete and incomplete category coverage); each figure now
+carries this caption. The UGCA figures (`ugca_vs_baselines.png`,
+`ugca_ablation.png`, `conflict_detector_auc.png`) are labeled **"All_Beauty
+only"**. All figures are regenerated from, and consistent with, their current
+source CSVs.
+
 ## 2. Experiments that ran successfully
 
 - Phase 1: `canonical_allbeauty_multiseed.csv` (40 rows = 8 models x 5 seeds),
