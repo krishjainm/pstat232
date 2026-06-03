@@ -1,0 +1,20 @@
+comparison,subset,metric,level,source,n_units,mean_delta,std_delta,t_ci_lo,t_ci_hi,boot_ci_lo,boot_ci_hi,ttest_p,wilcoxon_p,cohens_dz,mcnemar_p_median,bootstrap_p_median
+early_fusion_lc vs text_only,overall,accuracy,seed-paired,canon,5,0.005,0.0015,0.0031,0.0069,0.0041,0.0064,0.0019,0.0625,3.235,,
+early_fusion_lc vs text_only,overall,disagreement_acc,seed-paired,canon,5,0.002,0.016,-0.0178,0.0218,-0.0112,0.013,0.7911,0.8125,0.127,,
+early_fusion_lc vs text_only,overall,calibration_gap,seed-paired,canon,5,0.0685,0.0212,0.0422,0.0947,0.052,0.0849,0.0019,0.0625,3.237,,
+ugca_full vs early_fusion_lc,overall,disagreement_acc,seed-paired,ugca,5,0.0031,0.0175,-0.0187,0.0248,-0.0115,0.0153,0.716,0.8125,0.175,,
+ugca_full vs disagree_aware_lc,overall,disagreement_acc,seed-paired,ugca,5,-0.0204,0.0175,-0.0421,0.0014,-0.0332,-0.007,0.0599,0.125,-1.164,,
+ugca_full vs disagree_aware_lc,overall,accuracy,seed-paired,ugca,5,0.0156,0.004,0.0106,0.0206,0.0126,0.0186,0.001,0.0625,3.884,,
+ugca_full vs early_fusion_lc,overall,calibration_gap,seed-paired,ugca,5,0.0175,0.0292,-0.0187,0.0538,0.0006,0.044,0.2503,0.1875,0.601,,
+ugca_full vs early_fusion_lc,overall,ece,seed-paired,ugca,5,0.0111,0.0263,-0.0216,0.0438,-0.0112,0.0301,0.4005,0.625,0.42,,
+early_fusion_lc vs early_fusion_full,overall,accuracy,seed-paired,canon,5,-0.008,0.005,-0.0143,-0.0017,-0.0118,-0.0039,0.024,0.0625,-1.584,,
+early_fusion_lc vs early_fusion_full,overall,disagreement_acc,seed-paired,canon,5,-0.0239,0.0119,-0.0387,-0.0092,-0.033,-0.0149,0.0108,0.0625,-2.014,,
+early_fusion_lc vs text_only,pooled-multicat,accuracy,seed-paired,multicat,15,0.0069,0.006,0.0035,0.0102,0.0039,0.0099,0.0006,0.001,1.137,,
+early_fusion_lc vs text_only,pooled-multicat,disagreement_acc,seed-paired,multicat,15,0.024,0.0418,0.0008,0.0471,0.0041,0.0447,0.0434,0.048,0.573,,
+disagree_aware_lc vs early_fusion_lc,disagreement,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",canon_stats,5,0.0234,,,,,,,,,0.551,0.52
+early_fusion_full vs early_fusion_lc,overall,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",canon_stats,5,0.008,,,,,,,,,0.0264,0.025
+early_fusion_lc vs text_only,disagreement,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",canon_stats,5,0.002,,,,,,,,,0.6434,0.612
+early_fusion_lc vs text_only,overall,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",canon_stats,5,0.005,,,,,,,,,0.3973,0.399
+ugca_full vs early_fusion_lc,overall,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",ugca_recompute,5,0.002,,,,,,,,,0.7094,0.662
+ugca_full vs early_fusion_lc,disagreement,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",ugca_recompute,5,0.0031,,,,,,,,,0.5596,0.534
+ugca_full vs disagree_aware_lc,disagreement,accuracy,"example (per-seed McNemar+bootstrap, median over seeds)",ugca_recompute,5,-0.0204,,,,,,,,,0.461,0.422

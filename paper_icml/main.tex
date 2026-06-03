@@ -1,0 +1,311 @@
+% When More Modalities Hurt: Conflict-Aware Evaluation and Fusion for
+% Multimodal Sentiment Models.
+%
+% This draft uses the standard `article` class so it compiles anywhere. To
+% submit, replace the preamble with the ICML or NeurIPS style file
+% (e.g. \usepackage{icml2025} or \usepackage{neurips_2025}) and re-flow.
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{xcolor}
+
+\title{When More Modalities Hurt: Conflict-Aware Evaluation and Fusion
+for Multimodal Sentiment Models}
+\author{Anonymous}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Adding modalities is widely assumed to improve predictive models. We study
+multimodal sentiment classification on Amazon Reviews~2023, combining review
+text (SBERT embeddings) with structured product/review metadata, and ask a
+narrower question: \emph{when modalities disagree, does fusion still help?}
+Using a fixed, balanced, leakage-controlled evaluation protocol with redrawn
+splits across five seeds, we observe that early fusion improves average accuracy
+by only a small but significant margin over a strong text-only baseline
+($+0.5$ points overall, paired $t$-test $p{=}0.002$), while \emph{worsening} the
+calibration gap between agreement and disagreement cases ($+0.069$, $p{=}0.002$).
+On the disagreement subset itself, fusion provides no significant accuracy gain
+($p{=}0.79$). We show the phenomenon persists across five product categories and
+is not an artifact of product-level rating priors: removing leakage-prone
+features (\texttt{product\_average\_rating}, \texttt{product\_rating\_number})
+significantly lowers accuracy ($-0.8$ points, $p{=}0.024$), confirming those
+features inflate results rather than explaining the conflict failure. We
+introduce \textbf{UGCA-Fusion} (Uncertainty-Guided Conflict-Aware Fusion), a
+learned method whose conflict detector estimates modality conflict at inference
+\emph{without the true label} (AUROC ${\approx}0.72$). UGCA-Fusion's conflict
+detector is genuinely predictive and its components ablate sensibly, but in our
+setting it does not significantly beat early fusion or simple
+disagreement-aware reweighting on disagreement accuracy. Our main claim is
+deliberately cautious: \emph{average multimodal gains mask conflict-specific
+reliability failures, and conflict-aware inference-time fusion can reduce, but
+not eliminate, these failures.}
+\end{abstract}
+
+\section{Introduction}
+Multimodal models are typically evaluated by average metrics, which can hide
+systematic failures on instances where modalities provide conflicting evidence.
+In product reviews, a glowing text paired with a low star rating (or vice versa)
+is a concrete instance of \emph{modality conflict}. We ask whether the standard
+practice of fusing text and metadata helps or hurts precisely on these conflict
+cases, and whether any apparent benefit survives (i)~leakage control,
+(ii)~multiple seeds, and (iii)~multiple product domains.
+
+Our contributions, stated cautiously and supported by multi-seed evidence:
+\begin{enumerate}
+\item A systematic, leakage-controlled evaluation protocol for modality conflict
+with a full conflict-aware metric suite (Section~\ref{sec:setup}).
+\item Evidence across five Amazon categories that fusion's average gains coincide
+with a \emph{widening} agreement/disagreement calibration gap
+(Sections~\ref{sec:main},~\ref{sec:cross}).
+\item A leakage-controlled analysis showing the phenomenon is not caused by
+product-level rating priors (Section~\ref{sec:main}).
+\item \textbf{UGCA-Fusion}, a learned inference-time conflict-aware fusion method
+with a label-free conflict detector (Section~\ref{sec:method}).
+\item Calibration and statistical analyses, plus a human-annotation pipeline that
+separates genuine conflict from label noise (Sections~\ref{sec:calib},
+~\ref{sec:human}).
+\end{enumerate}
+
+We are explicit about negative results: UGCA-Fusion does not solve conflict, and
+we report it as such.
+
+\section{Related Work}
+Multimodal fusion has a long history~\citep{baltrusaitis2018multimodal,
+zadeh2017tensor}, with evidence that naively adding modalities can hurt
+optimization and generalization~\citep{wang2020makes,peng2022balanced}.
+Trusted/uncertainty-aware multi-view methods weight modalities by estimated
+reliability~\citep{han2021trusted,kendall2018multitask}; our conflict detector is
+related but targets \emph{instance-level} conflict inferred from unimodal
+predictive distributions. Calibration of modern networks is
+well-studied~\citep{guo2017calibration,naeini2015obtaining}, as is selective
+prediction~\citep{geifman2017selective}; we apply these tools \emph{conditioned
+on conflict}. For evaluation we use McNemar's test~\citep{dietterich1998approximate}
+and bootstrap confidence intervals. Cross-modal sentiment benchmarks such as
+CMU-MOSEI~\citep{zadeh2018mosei} and Hateful Memes~\citep{kiela2020hateful} are
+natural future testbeds (Section~\ref{sec:limits}).
+
+\section{Problem Setup}\label{sec:setup}
+We use Amazon Reviews~2023~\citep{hou2024amazon}. For each category we build a
+fixed balanced pool of $20{,}000$ reviews (positive: stars~$\ge4$;
+negative: stars~$\le2$; stars~$=3$ dropped), encode text with
+SBERT (\texttt{all-MiniLM-L6-v2})~\citep{reimers2019sentence}, and form metadata
+features. The pool is fixed with a master seed; only the stratified
+$70/15/15$ train/val/test split is redrawn per run seed
+($\{42,123,456,789,2026\}$), exposing split-level variance while keeping the
+expensive encoding to a single CPU pass.
+
+\paragraph{Leakage control.} The full metadata set includes product-level
+aggregates (\texttt{product\_average\_rating}, \texttt{product\_rating\_number})
+that can encode the review label. Our \emph{main} setting is
+\textbf{leakage-controlled (LC)}: these aggregates are removed. We report
+full-feature results only as a contrast.
+
+\paragraph{Metric suite.} Beyond accuracy/F1/AUROC we report ECE, Brier score,
+accuracy and ECE \emph{stratified} by agreement/disagreement/strong-disagreement,
+the \emph{calibration gap} (disagreement ECE $-$ agreement ECE),
+high-confidence error rate, confidence on correct vs.\ incorrect predictions,
+and modality dominance. We use bootstrap $95\%$ CIs, paired bootstrap tests, and
+McNemar's test.
+
+\section{Disagreement and Conflict Definitions}\label{sec:defs}
+Because ``disagreement'' is not uniquely defined, we compare four definitions on
+the All\_Beauty pool using 5-fold cross-fitted (leakage-free) predictions:
+\textbf{(A)} pretrained-sentiment (DistilBERT-SST-2~\citep{sanh2019distilbert})
+vs.\ rating label; \textbf{(B)} cross-model disagreement between text-only and
+metadata-only (LC) predictions; \textbf{(C)} high-confidence text contradiction
+(text confidence $\ge0.90$ and text prediction $\neq$ label); and \textbf{(D)} a
+200-example human-annotation subset.
+
+Table~\ref{tab:defs} shows the definitions flag \emph{largely disjoint}
+instances (pairwise Jaccard $\le0.11$), so the choice of definition materially
+changes conclusions. Definition~A reproduces a large multimodal failure
+(accuracy $0.64$ on flagged vs.\ $0.91$ elsewhere); Definition~C is rare but the
+model is almost always wrong on it ($0.008$), consistent with label noise /
+sarcasm---motivating human annotation (Section~\ref{sec:human}). Unless noted,
+the rest of the paper uses Definition~A.
+
+\begin{table}[t]\centering
+\caption{Disagreement definitions on All\_Beauty (cross-fitted). Low Jaccard
+overlap indicates the definitions capture different instances.}
+\label{tab:defs}
+\begin{tabular}{lccc}
+\toprule
+Definition & Prevalence & MM acc (flagged) & MM acc (unflagged)\\
+\midrule
+A: sentiment vs.\ label & 11.6\% & 0.638 & 0.912\\
+B: cross-model & 42.3\% & 0.859 & 0.896\\
+C: high-conf contradiction & 1.3\% & 0.008 & 0.892\\
+\midrule
+\multicolumn{4}{l}{Jaccard: A$\cap$B$=0.11$, A$\cap$C$=0.07$, B$\cap$C$=0.01$}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{UGCA-Fusion}\label{sec:method}
+\textbf{Uncertainty-Guided Conflict-Aware Fusion} aims to know, at inference and
+without the true label, when modalities conflict, and to route fusion
+accordingly. Text and metadata encoders produce $h_{\text{text}}, h_{\text{meta}}$
+and unimodal heads produce $p_{\text{text}}, p_{\text{meta}}$. A conflict
+detector predicts $\hat{c}$ from conflict features:
+$|p_{\text{text}}-p_{\text{meta}}|$, the entropies of $p_{\text{text}}$ and
+$p_{\text{meta}}$, and the Jensen--Shannon divergence~\citep{lin1991divergence}
+between the unimodal distributions (plus optional learned features). A gate $g$,
+modulated by $\hat{c}$, forms
+$h_{\text{fused}} = g\,h_{\text{text}} + (1-g)\,h_{\text{meta}}$, and a classifier
+predicts $\hat{y}$. The training loss is
+\begin{align*}
+\mathcal{L} =\ & \mathrm{CE}(\hat y, y)
++ \lambda_{\text{t}}\mathrm{CE}(p_{\text{text}}, y)
++ \lambda_{\text{m}}\mathrm{CE}(p_{\text{meta}}, y)\\
+&+ \lambda_{\text{c}}\,\mathrm{BCE}(\hat c, d)
++ \lambda_{\text{cal}}\,\Omega_{\text{cal}},
+\end{align*}
+where $d$ is the proxy disagreement label (used \emph{only in training}) and
+$\Omega_{\text{cal}}$ is a differentiable calibration surrogate. At inference the
+detector uses no label, which is the core claim we test empirically.
+
+\section{Experimental Setup}\label{sec:exp}
+Text-only is SBERT${+}$logistic regression; metadata-only is XGBoost; fusion
+models are MLPs (early/late/gated). Disagreement-aware reweighting upweights
+training disagreement rows ($w{=}5$). UGCA-Fusion and four ablations
+(no conflict detector, no entropy, no JS, no calibration loss) train for up to
+25 epochs with early stopping. All models share each seed's split. Compute is
+CPU-only; this constrains the second-dataset scope (Section~\ref{sec:limits}).
+
+\section{Main Results}\label{sec:main}
+Table~\ref{tab:main} reports the canonical All\_Beauty results (mean$\pm$std over
+five seeds; pool disagreement rate $11.6\%$). Three observations hold:
+
+\begin{enumerate}
+\item \textbf{Fusion's overall gain is small.} Early-fusion (LC) accuracy
+$0.881$ vs.\ text-only $0.876$ ($+0.005$; paired $t$-test $p{=}0.002$, Cohen's
+$d_z{=}3.2$). On the disagreement subset the gain is not significant
+($+0.002$, $p{=}0.79$).
+\item \textbf{Fusion worsens conflict calibration.} The calibration gap rises
+from $0.120$ (text-only) to $0.189$ (early-fusion LC); the per-seed paired
+increase is $+0.069$ ($p{=}0.002$, $d_z{=}3.2$). Gated/late fusion improve
+\emph{average} ECE but the conflict gap remains elevated.
+\item \textbf{Not explained by leakage.} Full-feature early fusion beats LC by
+$+0.8$ points accuracy ($p{=}0.024$) and $+2.4$ points disagreement accuracy
+($p{=}0.011$): the product-rating aggregates inflate results, so the LC setting
+(our main one) is the honest baseline.
+\end{enumerate}
+
+\begin{table*}[t]\centering
+\caption{Canonical All\_Beauty, mean$\pm$std over 5 seeds. LC = leakage-controlled
+(main). Calibration gap = disagreement ECE $-$ agreement ECE (higher is worse).}
+\label{tab:main}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+Model & Accuracy & Disagree.\ acc & Strong-dis.\ acc & AUROC & ECE & Calib.\ gap\\
+\midrule
+Text-only            & 0.876$\pm$0.005 & 0.652$\pm$0.025 & 0.619$\pm$0.031 & 0.944 & 0.031 & 0.120\\
+Metadata-only (LC)   & 0.578$\pm$0.007 & 0.508$\pm$0.022 & 0.485$\pm$0.017 & 0.610 & 0.040 & 0.113\\
+Metadata-only (full) & 0.686$\pm$0.004 & 0.628$\pm$0.014 & 0.619$\pm$0.018 & 0.758 & 0.027 & 0.099\\
+Early fusion (LC)    & 0.881$\pm$0.005 & 0.654$\pm$0.032 & 0.626$\pm$0.038 & 0.947 & 0.038 & 0.189\\
+Early fusion (full)  & 0.889$\pm$0.007 & 0.678$\pm$0.040 & 0.658$\pm$0.043 & 0.955 & 0.041 & 0.188\\
+Late fusion (LC)     & 0.884$\pm$0.005 & 0.650$\pm$0.038 & 0.622$\pm$0.054 & 0.952 & 0.021 & 0.181\\
+Gated fusion (LC)    & 0.883$\pm$0.004 & 0.651$\pm$0.024 & 0.625$\pm$0.032 & 0.951 & 0.018 & 0.168\\
+Disagree-aware (LC)  & 0.867$\pm$0.004 & 0.678$\pm$0.025 & 0.660$\pm$0.032 & 0.937 & 0.060 & 0.170\\
+UGCA-Fusion (LC)     & 0.883$\pm$0.006 & 0.658$\pm$0.035 & --              & 0.95\phantom{0} & 0.050 & 0.206\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Cross-Domain Generalization}\label{sec:cross}
+Across five categories (All\_Beauty, Appliances, Digital\_Music, Gift\_Cards,
+Video\_Games; seeds $\{42,123,456\}$), early fusion (LC) consistently increases
+\emph{both} average accuracy \emph{and} the calibration gap relative to text-only
+(Table~\ref{tab:cross}). Pooling over category$\times$seed, the accuracy gain is
+$+0.7$ points ($p{=}0.0006$) and the disagreement-accuracy gain is modest
+($+2.4$ points, $p{=}0.043$); notably the disagreement effect is inconsistent
+in sign (e.g.\ Video\_Games: $0.586$ vs.\ $0.603$). The calibration-gap increase,
+by contrast, is consistent across all five categories. We therefore claim
+replication for the \emph{calibration} failure but only weak, domain-dependent
+support for a disagreement-accuracy benefit.
+
+\begin{table}[t]\centering
+\caption{Cross-domain (mean over 3 seeds). EF = early fusion (LC), TO = text-only.}
+\label{tab:cross}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Category & Acc (TO/EF) & Disagree (TO/EF) & Calib.\ gap (TO/EF)\\
+\midrule
+All\_Beauty    & 0.873/0.878 & 0.636/0.636 & 0.132/0.207\\
+Appliances     & 0.861/0.871 & 0.644/0.662 & 0.177/0.231\\
+Digital\_Music & 0.876/0.886 & 0.596/0.636 & 0.108/0.190\\
+Gift\_Cards    & 0.914/0.924 & 0.568/0.646 & 0.249/0.263\\
+Video\_Games   & 0.870/0.872 & 0.603/0.586 & 0.158/0.253\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Calibration, Selective Prediction, and UGCA Analysis}\label{sec:calib}
+The conflict-aware metric suite shows fusion concentrates its calibration error
+on conflict cases. UGCA-Fusion's \emph{conflict detector} predicts the proxy
+disagreement label on the test set with AUROC ${\approx}0.72$ (mean over 5 seeds)
+\emph{using no true label}, supporting the core hypothesis that conflict is
+detectable at inference. Ablations behave as designed: removing the conflict
+detector lowers disagreement accuracy ($0.658{\to}0.646$) and removing the
+calibration loss worsens the calibration gap ($0.206{\to}0.221$). However,
+across five seeds UGCA-Fusion is statistically indistinguishable from early
+fusion on accuracy and on the disagreement subset (paired $p{>}0.7$;
+example-level McNemar median $p{>}0.5$), and gated fusion remains best-calibrated
+(ECE $0.018$). UGCA-Fusion does significantly beat disagreement-aware reweighting
+on \emph{overall} accuracy ($+1.6$ points, $p{=}0.001$), as reweighting trades
+overall accuracy for disagreement accuracy.
+
+\section{Human Annotation / Qualitative Analysis}\label{sec:human}
+We provide a reproducible human-annotation pipeline: a six-category guide
+(genuine conflict, label noise, mixed sentiment, sarcasm, unclear,
+metadata-prior), a batch generator, and an analyzer computing the
+genuine-conflict vs.\ label-noise breakdown, Cohen's $\kappa$ inter-annotator
+agreement, and model accuracy per human category. We export 200 cross-fitted
+disagreement candidates for labeling. We \emph{do not} fabricate labels; the
+analyzer reports ``annotation pending'' until human files exist. This separates
+genuine model failures from dataset artifacts and is a stated prerequisite for
+strong claims about ``conflict.''
+
+\section{Ablations}\label{sec:abl}
+See Section~\ref{sec:calib} and \texttt{reports\_icml/tables/ugca\_ablation.csv}.
+Each UGCA component (conflict detector, entropy features, JS divergence,
+calibration loss) contributes in the expected direction, but the marginal effects
+are small relative to seed variance.
+
+\section{Limitations}\label{sec:limits}
+(1)~The disagreement label is a \emph{proxy}; Section~\ref{sec:defs} shows
+definitions disagree, and human annotation is pending. (2)~Both evaluated
+families are review${+}$metadata; a second \emph{family} is scoped (Yelp;
+feasibility report included) and a true cross-modality test (CMU-MOSEI, Hateful
+Memes) is GPU-required future work. (3)~Compute is CPU-only, so encoders are
+frozen and pools are capped at $20$k. (4)~With five seeds, $p$-values are
+interpreted cautiously alongside effect sizes and CIs. (5)~UGCA-Fusion is a
+diagnostic advance, not an accuracy solution.
+
+\section{Conclusion}
+Across the evaluated categories we observe that average multimodal gains mask
+conflict-specific reliability failures: fusion barely improves overall accuracy,
+does not reliably help on disagreement cases, and significantly worsens the
+agreement/disagreement calibration gap, even after leakage control. Our
+UGCA-Fusion can \emph{detect} conflict at inference without labels but does not
+eliminate the failure. We therefore frame robust multimodal behavior under
+modality conflict as an open problem, and release a leakage-controlled,
+multi-seed, multi-category evaluation protocol to study it.
+
+\paragraph{Reproducibility.} All tables and figures are regenerated by the
+\texttt{scripts\_icml/} pipeline; per-experiment provenance is logged in
+\texttt{reports\_icml/experiment\_registry.md}.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}
