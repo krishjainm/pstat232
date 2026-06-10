@@ -1,10 +1,10 @@
-"""Shared utilities for the ICML/NeurIPS upgrade (Phase 1+).
+"""Shared computational utilities for the disagreement-aware fusion study.
 
 This module centralizes:
   * canonical data preparation (download -> preprocess -> disagreement -> SBERT cache)
   * leakage-controlled vs full metadata feature sets
-  * cheap per-seed model training that reuses cached SBERT embeddings
-  * the full conflict-aware metric suite required by Phase 1
+  * CPU-light per-seed model training on cached SBERT embeddings
+  * the full conflict-aware metric suite
   * an experiment-registry logger
 
 Design choice (documented honestly): the *balanced pool* is built once with a
@@ -24,7 +24,7 @@ import datetime as _dt
 import numpy as np
 import pandas as pd
 
-# Reuse validated preprocessing from the main project (read-only use).
+# Validated preprocessing helpers (read-only use).
 from src.data.preprocess import (
     create_binary_label,
     merge_metadata,
@@ -37,7 +37,7 @@ DATASET = "McAuley-Lab/Amazon-Reviews-2023"
 MASTER_SEED = 2024  # fixes the balanced pool; splits are redrawn per run-seed
 
 # Metadata feature sets ------------------------------------------------------
-# Full set mirrors the original project.
+# Full set (includes the leakage-prone product-level rating aggregate).
 METADATA_FULL = [
     "review_length_words",
     "review_length_chars",
@@ -68,11 +68,11 @@ def _ensure(path):
 
 
 def raw_dir(category):
-    return _ensure(os.path.join("data_icml", "raw", category))
+    return _ensure(os.path.join("data_pool", "raw", category))
 
 
 def interim_dir(category):
-    return _ensure(os.path.join("data_icml", "interim", category))
+    return _ensure(os.path.join("data_pool", "interim", category))
 
 
 def pool_path(category):
