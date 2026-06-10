@@ -17,7 +17,7 @@
 \title{A Computational Study of Disagreement-Aware Fusion,\\
 Calibration, and Resampling Inference\\
 in Text and Metadata Classification}
-\author{Krishna \\
+\author{Krish Jain \\
   PSTAT 232: Computational Techniques in Statistics \\
   Department of Statistics \& Applied Probability \\
   University of California, Santa Barbara}
@@ -440,8 +440,8 @@ a detectable accuracy gain, and the cost of that complexity is real.
 conflict region is measurably less calibrated and warrants a larger temperature,
 yet a global temperature already removes most of the error; the
 group-conditional estimator helps chiefly on the non-conflict majority. The
-strong conflict miscalibration seen previously was largely a side-effect of
-leakage.
+strong conflict miscalibration observed in the full-feature setting was largely a
+side-effect of leakage.
 
 \section{Limitations}
 \label{sec:limitations}
@@ -467,8 +467,8 @@ leakage.
 \section{Conclusion}
 \label{sec:conclusion}
 
-Reframing a multimodal-disagreement study around computational statistics yields
-sharper, more honest conclusions than a leaderboard framing. Empirical risk
+This computational study of multimodal disagreement yields sharper, more honest
+conclusions than a leaderboard-style comparison. Empirical risk
 decomposition exposes a conditional-risk gap under conflict; reweighted ERM
 reallocates rather than eliminates that risk; resampling inference shows the
 fusion advantage is within sampling noise once leakage is controlled; and
