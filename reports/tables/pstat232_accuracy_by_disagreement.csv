@@ -1,0 +1,17 @@
+model,disagreement_group,n,accuracy
+text_only,agreement,2633,0.905051272312951
+text_only,weak_disagreement,40,0.775
+text_only,medium_disagreement,38,0.8421052631578947
+text_only,strong_disagreement,290,0.596551724137931
+metadata_only_lc,agreement,2633,0.5750094948727688
+metadata_only_lc,weak_disagreement,40,0.65
+metadata_only_lc,medium_disagreement,38,0.5263157894736842
+metadata_only_lc,strong_disagreement,290,0.47586206896551725
+multimodal_lc,agreement,2633,0.9080896315989365
+multimodal_lc,weak_disagreement,40,0.725
+multimodal_lc,medium_disagreement,38,0.8157894736842105
+multimodal_lc,strong_disagreement,290,0.6172413793103448
+disagreement_aware_lc,agreement,2633,0.8894796809722749
+disagreement_aware_lc,weak_disagreement,40,0.75
+disagreement_aware_lc,medium_disagreement,38,0.7894736842105263
+disagreement_aware_lc,strong_disagreement,290,0.6344827586206897

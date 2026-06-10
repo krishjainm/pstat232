@@ -1,7 +1,15 @@
 .PHONY: all install download preprocess disagreement train evaluate figures \
-        fusion disagree-aware extras paper clean test
+        fusion disagree-aware extras paper clean test \
+        pstat232 pstat232-main pstat232-calibration pstat232-inference \
+        pstat232-tables pstat232-figures pstat232-report
 
 PYTHON ?= python
+
+# Category and settings for the PSTAT 232 (computational statistics) pipeline.
+CATEGORY ?= All_Beauty
+SEED ?= 42
+TAU ?= 0.5
+NBOOT ?= 2000
 
 all: download preprocess disagreement train evaluate figures
 
@@ -52,6 +60,29 @@ multi-seed:
 
 test:
 	$(PYTHON) -m pytest tests/ -v
+
+# ----------------------------------------------------------------------------
+# PSTAT 232 (computational statistics) pipeline. Runs offline from the
+# materialized pools/embeddings in data_icml/ (no download/encoding needed).
+# ----------------------------------------------------------------------------
+pstat232: pstat232-tables pstat232-figures
+
+pstat232-main:
+	$(PYTHON) scripts/pstat232_leakage_controlled_main.py --category $(CATEGORY) --seed $(SEED)
+
+pstat232-calibration:
+	$(PYTHON) scripts/pstat232_group_conditional_calibration.py --category $(CATEGORY) --tau $(TAU)
+
+pstat232-inference:
+	$(PYTHON) scripts/pstat232_resampling_inference.py --category $(CATEGORY) --n-boot $(NBOOT) --seed $(SEED)
+
+pstat232-tables: pstat232-main pstat232-calibration pstat232-inference
+
+pstat232-figures:
+	$(PYTHON) scripts/pstat232_make_figures.py --category $(CATEGORY) --tau $(TAU)
+
+pstat232-report:
+	cd paper && pdflatex -interaction=nonstopmode pstat232_report.tex && pdflatex -interaction=nonstopmode pstat232_report.tex
 
 paper:
 	cd paper && pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex

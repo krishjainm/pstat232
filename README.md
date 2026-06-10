@@ -1,153 +1,214 @@
-# When Modalities Disagree: Failure Modes and Mitigations in Multimodal Sentiment Classification
+# A Computational Study of Disagreement-Aware Fusion, Calibration, and Resampling Inference in Text and Metadata Classification
 
-## Research Question
+**PSTAT 232 — Computational Techniques in Statistics — Final Project**
 
-How do multimodal models behave when input modalities conflict, which modality dominates under disagreement, and can simple training-time interventions help?
+> This repository was previously a PSTAT 262DS machine-learning project on
+> multimodal disagreement failures. It has been refactored into a
+> **computational-statistics** study: empirical risk minimization and a
+> disagreement-aware variant, post-hoc calibration with a new group-conditional
+> estimator, resampling-based inference (bootstrap CIs + paired tests), and a
+> **leakage-controlled** evaluation protocol. See
+> [`PSTAT232_REFACTOR_PLAN.md`](PSTAT232_REFACTOR_PLAN.md) for a file-by-file
+> account of what was reused, changed, and archived, and the relationship to the
+> previous project below.
 
-## Overview
+## Main Research Question
 
-Multimodal models combine multiple sources of information (e.g., text and metadata) under the assumption that more data improves predictions. This project investigates what happens when those sources *disagree*—for example, when a review's text sounds positive but its star rating is low. We show that fusion models degrade dramatically under modality conflict, then demonstrate that **disagreement-aware loss reweighting** can partially mitigate these failures.
+When two modalities (review **text** and structured **metadata**) disagree, how
+should we *fuse*, *calibrate*, and *do inference* about a classifier — and how
+much of the apparent multimodal benefit survives once we (a) control for label
+leakage and (b) attach honest sampling uncertainty?
 
-## Key Findings
+Sub-questions:
 
-| Metric | Text-Only | Metadata-Only | Multimodal | DA (w=5) |
-|--------|-----------|---------------|------------|----------|
-| Overall Accuracy | 0.868 | 0.679 | **0.888** | 0.873 |
-| Disagreement Accuracy | 0.592 | 0.615 | 0.641 | **0.673** |
-| Disagreement F1 | 0.648 | 0.670 | 0.685 | **0.728** |
-| Strong Disagree Acc. | 0.545 | **0.613** | 0.586 | — |
-| AUROC | 0.943 | 0.749 | **0.956** | 0.944 |
+1. How does empirical risk decompose across agreement and graded-disagreement
+   strata, and does reweighting the ERM objective toward conflict cases change
+   that decomposition?
+2. Is the fusion model's accuracy advantage statistically real under resampling,
+   or within sampling noise?
+3. Is miscalibration homogeneous, or does it concentrate in the conflict region
+   — and can a **group-conditional** post-hoc calibrator using a label-free
+   conflict proxy exploit that?
+4. How much of the metadata model's measured skill is an artifact of a
+   label-encoding product-level rating aggregate?
 
-- Multimodal fusion improves average accuracy (+2.0 pp over text-only) but degrades disproportionately under modality conflict (64.1% on disagreement vs. 91.9% on agreement).
-- **Disagreement-aware reweighting (w=5)** improves disagreement accuracy by +3.2 pp and F1 by +4.3 pp, at only 1.5 pp overall cost.
-- The fusion model follows text predictions in **82.2%** of true-conflict cases.
-- All three fusion architectures (early, late, gated) perform comparably (88.3–88.9%), suggesting the problem is paradigmatic, not architectural.
-- Disagreement induces severe miscalibration: ECE of 0.219 vs. 0.017 for agreement cases (13× increase). Temperature scaling fails to close this gap.
+## Statistical Methods Used
 
-## Reliability Caveats (read before citing the numbers)
+- **Empirical risk minimization (ERM)** for text-only (logistic regression on
+  sentence-transformer embeddings), metadata-only (gradient-boosted trees), and
+  early-fusion (MLP) models, plus a **disagreement-aware reweighted ERM** variant.
+- **Post-hoc calibration / UQ**: temperature scaling fit by NLL on validation;
+  **group-conditional temperature scaling** driven by an inference-time conflict
+  proxy; ECE, NLL, Brier score, reliability diagrams, selective-prediction curves.
+- **Resampling inference**: nonparametric bootstrap 95% percentile CIs for
+  accuracy / F1 / AUROC / ECE / Brier; **paired bootstrap** tests and
+  **McNemar's** continuity-corrected χ² test for model comparisons.
+- **Experimental-design control**: a **leakage-controlled** primary pipeline that
+  removes `product_average_rating` (a product-level aggregate of the rating that
+  the label is derived from); the leaky configuration is kept only as a
+  sensitivity ablation.
 
-These follow from the research-upgrade audit (`reports/research_upgrade_baseline_check.md`, `reports/leakage_audit.md`, `reports/neurlips_icml_upgrade_summary.md`) and are reported honestly:
+## Leakage-Controlled Setup (primary version)
 
-- **Fusion's advantage concentrates in the agreement regime.** On the *strong*-disagreement subset, multimodal is **not** statistically better than text-only (McNemar p = 0.136) or metadata-only (p = 0.53). The headline accuracy gain is real overall but erodes exactly where modalities conflict.
-- **Metadata leakage.** The metadata model's skill is largely driven by `product_average_rating`, a product-level aggregate that partially encodes the label: removing it drops metadata CV accuracy from 0.66 → 0.55. The `no_product_average_rating` configuration is the more conservative setting.
-- **"Disagreement" is a proxy.** It is defined via a pretrained sentiment model vs. the rating-derived label, so the disagreement subset is enriched for hard/mislabeled reviews (see qualitative case 4).
-- **Mitigations help modestly.** Severity-aware reweighting gives the best disagreement-accuracy gains; focal loss / temperature scaling help calibration but not disagreement accuracy. No method fixes both, and multi-seed runs show gains are comparable to training variance. The extended mitigation and multi-seed studies were run on the Appliances split (the materialized data on hand).
+The label `Y` is derived from the per-review star rating. The metadata feature
+`product_average_rating` is a **product-level aggregate of star ratings**, so it
+partially encodes the label — a textbook target-leakage source. The **primary
+PSTAT 232 pipeline removes** `product_average_rating` and the prior-driven
+`product_rating_number`. The full (leaky) feature set is run **only** as the
+sensitivity ablation in `reports/tables/pstat232_leakage_ablation.csv`.
+
+Effect of removing the leaky feature (`All_Beauty` test set):
+
+| Model | Feature set | Accuracy | AUROC | ECE |
+|-------|-------------|----------|-------|-----|
+| Metadata-only | leakage-controlled | 0.566 | 0.600 | 0.050 |
+| Metadata-only | full (leaky) | 0.687 | 0.755 | 0.028 |
+| Multimodal | leakage-controlled | 0.876 | 0.947 | 0.026 |
+| Multimodal | full (leaky) | 0.878 | 0.953 | 0.062 |
+
+The leaky aggregate inflates metadata accuracy by ~12 pp and AUROC by +0.155, but
+adds almost nothing to fusion accuracy while *tripling* fusion ECE.
+
+## Key Results (`All_Beauty`, seed 42, leakage-controlled)
+
+| Model | Accuracy | Disagree. acc. | AUROC | ECE | Brier |
+|-------|----------|----------------|-------|-----|-------|
+| Text-only | 0.873 | 0.641 | 0.943 | 0.028 | 0.093 |
+| Metadata-only (LC) | 0.566 | 0.500 | 0.600 | 0.050 | 0.245 |
+| Multimodal (LC) | **0.876** | 0.649 | **0.947** | **0.026** | **0.090** |
+| Disagreement-aware (LC) | 0.862 | **0.663** | 0.936 | 0.072 | 0.108 |
+
+Under resampling inference, **fusion is not statistically better than text-only**
+(paired bootstrap *p* = 0.42; McNemar *p* = 0.42), but is overwhelmingly better
+than the leakage-controlled metadata model (*p* < 0.001). The disagreement-aware
+model improves disagreement accuracy but is significantly worse overall
+(*p* = 0.002). Group-conditional calibration reduces non-conflict ECE
+(0.0157 → 0.0137) and overall NLL; after leakage control the conflict-driven
+miscalibration is mild — much of the previously reported calibration pathology
+was a leakage artifact.
+
+## Reproducibility Commands
+
+All PSTAT 232 steps run **offline** from the materialized canonical pool and
+cached embeddings under `data_icml/` (no download or re-encoding needed).
+
+```bash
+pip install -r requirements.txt
+
+# Full PSTAT 232 pipeline (or run the steps individually below)
+make pstat232
+
+# 1. Leakage-controlled ERM models + per-sample predictions + main/ablation tables
+python scripts/pstat232_leakage_controlled_main.py --category All_Beauty --seed 42
+
+# 2. Group-conditional calibration (table + figure)
+python scripts/pstat232_group_conditional_calibration.py --category All_Beauty --tau 0.5
+
+# 3. Bootstrap CIs + paired comparisons
+python scripts/pstat232_resampling_inference.py --category All_Beauty --n-boot 2000
+
+# 4. All PSTAT 232 figures
+python scripts/pstat232_make_figures.py --category All_Beauty
+
+# Targeted Make wrappers
+make pstat232-tables     # steps 1 + 2 + 3 (CSV outputs)
+make pstat232-figures    # step 4
+make pstat232-report     # compile paper/pstat232_report.tex
+
+# Tests
+make test                # 32 unit tests (pytest)
+```
+
+> Step 1 persists `data_icml/processed/All_Beauty_pstat232_{val,test}_predictions.parquet`,
+> which steps 2–4 consume, so calibration / inference / figures need no retraining.
+
+## Main Outputs
+
+**Report**
+
+- `paper/pstat232_report.tex` — the PSTAT 232 report (compiles to PDF with
+  `make pstat232-report`).
+
+**Tables** (`reports/tables/`)
+
+- `pstat232_main_results.csv` — primary leakage-controlled model metrics.
+- `pstat232_leakage_ablation.csv` — LC vs full (leaky) feature sets.
+- `pstat232_accuracy_by_disagreement.csv` — accuracy per severity stratum.
+- `pstat232_group_calibration.csv` — uncalibrated / global / group-conditional T.
+- `pstat232_bootstrap_ci.csv` — bootstrap 95% CIs.
+- `pstat232_paired_comparisons.csv` — paired bootstrap + McNemar tests.
+- `pstat232_selective_prediction.csv` — selective accuracy vs coverage.
+
+**Figures** (`reports/figures/`)
+
+- `pstat232_accuracy_by_disagreement.png`
+- `pstat232_calibration_by_group.png`
+- `pstat232_group_calibration.png`
+- `pstat232_leakage_ablation.png`
+- `pstat232_selective_prediction.png`
+
+**Prediction artifacts** (`data_icml/processed/`)
+
+- `All_Beauty_pstat232_{val,test}_predictions.parquet`
+
+## Relationship to the Previous PSTAT 262DS Project
+
+The earlier PSTAT 262DS project ("When Modalities Disagree: Failure Modes and
+Mitigations in Multimodal Sentiment Classification") framed the task as a
+multimodal **ML benchmark**: which fusion architecture wins, by how much, and
+which modality dominates under conflict. Its paper, the ICML/NeurIPS upgrade
+(`paper_icml/`, `scripts_icml/`, `reports_icml/`), and the original analyses are
+**retained** as prior work and reused infrastructure.
+
+### What changed from the old version
+
+| Aspect | PSTAT 262DS (old) | PSTAT 232 (this version) |
+|--------|-------------------|--------------------------|
+| Framing | Multimodal ML / leaderboard | Computational statistics |
+| Leakage | Audited in an appendix; leaky feature used in main results | **Leakage-controlled is the primary pipeline**; leaky set is a sensitivity ablation only |
+| Inference | Bootstrap CIs + McNemar reported | **Resampling inference is central**: bootstrap CIs *and* paired bootstrap tests for every key comparison |
+| Calibration | Global temperature scaling | **Group-conditional temperature scaling** via a label-free inference-time conflict proxy (new extension) |
+| Main deliverable | `paper/main.tex` | `paper/pstat232_report.tex` |
+| New scripts | — | `scripts/pstat232_*.py` (4 scripts) |
+| Old class/submission files | in `reports/` | moved to `archive/pstat262ds/` |
+
+The reused code lives in `src/` (data, features, models, evaluation,
+visualization) and `scripts_icml/icml_common.py` (canonical pool loading, cached
+SBERT, CPU-light ERM training, the metric suite, and bootstrap/McNemar helpers),
+on which the new `scripts/pstat232_*.py` are built.
 
 ## Dataset
 
-**Amazon Reviews 2023** (McAuley Lab) — `All_Beauty` category (configurable to other categories).
-
-- Binary sentiment classification: positive (rating ≥ 4) vs. negative (rating ≤ 2); neutrals dropped.
-- Class-balanced via majority-class downsampling: 20,674 samples (10,337 per class).
-- 70/15/15 stratified train/val/test split → 14,471 / 3,101 / 3,102 samples.
-- 11.1% disagreement rate on test set (343 of 3,102 samples).
-
-## Models
-
-| Model | Input | Architecture |
-|-------|-------|-------------|
-| Text-only | Review text | Sentence-Transformer (`all-MiniLM-L6-v2`) + Logistic Regression |
-| Metadata-only | Structured features (8-d) | XGBoost (200 estimators, max depth 6) |
-| Multimodal (Early) | Text + metadata (392-d) | 2-layer MLP (256→64→2) with ReLU + dropout |
-| Multimodal (Late) | Text + metadata | Separate MLPs, averaged logits |
-| Multimodal (Gated) | Text + metadata | Learned sigmoid gate over modality representations |
-| Disagree-Aware | Text + metadata | Early fusion + disagreement-weighted cross-entropy loss |
-| Majority Baseline | — | Always predicts majority class (50% on balanced data) |
-
-## Analyses
-
-1. **Disagreement severity**: Classify reviews by how strongly text sentiment contradicts the rating label (weak / medium / strong disagreement).
-2. **Group-level evaluation**: Accuracy, F1, AUROC with 95% bootstrap CIs for agreement vs. disagreement subsets.
-3. **Modality dominance**: Label-based, probability-based, and true-conflict dominance analysis.
-4. **Fusion comparison**: Side-by-side evaluation of early, late, and gated fusion architectures.
-5. **Disagreement-aware training**: Loss reweighting that upweights disagreement samples during training (w ∈ {3, 5}).
-6. **Selective abstention**: Baseline that falls back to metadata predictions when text/metadata disagree.
-7. **Statistical significance**: McNemar's test (continuity-corrected) for all pairwise model comparisons.
-8. **Calibration**: Group-conditional ECE, temperature scaling experiments, selective prediction curves.
-9. **Feature importance**: XGBoost feature importances for metadata model.
-10. **Error taxonomy**: Heuristic classification of failure modes (sarcasm, mixed sentiment, short reviews, conditional sentiment, topic drift, etc.).
-
-## How to Run
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the full pipeline
-python scripts/01_download_data.py
-python scripts/02_preprocess_data.py
-python scripts/03_define_disagreement.py
-python scripts/04_train_text_model.py
-python scripts/05_train_metadata_model.py
-python scripts/06_train_multimodal_model.py
-python scripts/07_evaluate_models.py
-python scripts/08_generate_figures.py
-
-# Additional scripts
-python scripts/09_fusion_comparison.py          # Compare early/late/gated fusion
-python scripts/10_disagreement_aware.py         # Disagreement-aware training + selective abstention
-python scripts/run_all_categories.py            # Run across multiple product categories
-python scripts/run_experiments.py               # Multi-seed experiments
-
-# Research-upgrade analyses (rigor / generalization / honesty checks)
-python scripts/upgrade_extended_stats.py        # Paired-bootstrap + McNemar on key comparisons
-python scripts/upgrade_qualitative.py           # 6 representative qualitative case studies
-python scripts/upgrade_leakage_audit.py         # Metadata leakage audit + correlations
-python scripts/upgrade_ablation.py              # Metadata / text-encoder / fusion ablations
-python scripts/upgrade_cross_category_figs.py   # Cross-category figures from results CSV
-python scripts/upgrade_mitigation.py            # Mitigation comparison (needs SBERT; trains variants)
-python scripts/upgrade_multiseed.py             # Multi-seed robustness (needs cached SBERT features)
-
-# Or use Make
-make all                # Core pipeline (scripts 01-08)
-make extras             # Fusion comparison + disagreement-aware (scripts 09-10)
-make multi-category     # Cross-category comparison
-make multi-seed         # Multi-seed robustness
-make test               # Run unit tests
-make paper              # Compile LaTeX paper
-```
-
-## Tests
-
-```bash
-python -m pytest tests/ -v
-```
-
-32 unit tests covering metrics, calibration, disagreement, models, preprocessing, qualitative analysis, and statistical tests.
-
-## Outputs
-
-- **Tables** (`reports/tables/`): main/group results, bootstrap CIs, McNemar's tests, fusion comparison, calibration, modality dominance, temperature scaling, selective prediction, error taxonomy, case studies, disagreement-aware comparison, plus research-upgrade tables: `statistical_tests_extended.csv`, `mitigation_comparison.csv`, `ablation_results.csv`, `metadata_correlations.csv`, `multiseed_results.csv`, `qualitative_case_studies.csv`.
-- **Figures** (`reports/figures/`): the original 14 PNGs plus cross-category (`cross_category_accuracy/disagreement_gap/calibration_gap.png`), mitigation (`mitigation_tradeoff/disagreement_accuracy/calibration.png`), `ablation_summary.png`, `multiseed_error_bars.png`, and `metadata_feature_importance_no_leakage.png`.
-- **Models** (`models/`): Saved model checkpoints and artifacts for text, metadata, multimodal, and disagreement-aware models.
-- **Paper** (`paper/main.tex`): Full LaTeX paper (12 pages) with cross-category generalization, mitigation comparison, ablation + leakage audit, and a strengthened limitations section.
-- **Reports** (`reports/`): `verification_report.md`, `research_upgrade_baseline_check.md`, `leakage_audit.md`, `qualitative_case_studies.md`, `neurlips_icml_upgrade_summary.md`.
+**Amazon Reviews 2023** (McAuley Lab), primary category `All_Beauty`
+(`Appliances`, `Digital_Music`, `Gift_Cards`, `Video_Games` materialized for
+sensitivity). Binary sentiment: positive (rating ≥ 4) vs negative (rating ≤ 2),
+neutrals dropped, class-balanced pool of 20,000 with a 70/15/15 stratified split.
 
 ## Project Structure
 
 ```
-├── config/config.yaml              # All hyperparameters and settings
-├── data/                           # Raw, interim, and processed data
-├── notebooks/                      # Exploration and analysis notebooks
-├── src/                            # Reusable source modules
-│   ├── data/                       # Download, preprocess, split
-│   ├── features/                   # Metadata features, disagreement labels
-│   ├── models/                     # Training and prediction
-│   ├── evaluation/                 # Metrics, calibration, group analysis,
-│   │                               # statistical tests, temperature scaling,
-│   │                               # ablation, qualitative analysis
-│   └── visualization/              # Plotting functions
-├── scripts/                        # Runnable pipeline scripts (01–10)
-│   ├── run_all_categories.py       # Multi-category pipeline
-│   └── run_experiments.py          # Multi-seed experiments
-├── paper/                          # LaTeX paper and references
-├── models/                         # Saved model artifacts
-├── reports/                        # Figures, tables, outlines
-├── tests/                          # 32 unit tests
-├── Makefile                        # Build automation
-└── requirements.txt                # Pinned dependencies
+├── paper/
+│   ├── pstat232_report.tex          # PSTAT 232 report (primary deliverable)
+│   └── main.tex                     # prior PSTAT 262DS paper (retained)
+├── scripts/
+│   ├── pstat232_leakage_controlled_main.py
+│   ├── pstat232_group_conditional_calibration.py
+│   ├── pstat232_resampling_inference.py
+│   ├── pstat232_make_figures.py
+│   └── 01..10_*.py                  # original pipeline (retained)
+├── scripts_icml/                    # reused infra (canonical data, training, stats)
+├── src/                             # reusable modules (data/features/models/eval/viz)
+├── data_icml/                       # materialized pools, cached SBERT, predictions
+├── reports/figures, reports/tables  # PSTAT 232 + original outputs
+├── archive/pstat262ds/              # archived class/submission-specific files
+├── tests/                           # 32 unit tests
+├── Makefile                         # includes pstat232* targets
+├── requirements.txt
+└── PSTAT232_REFACTOR_PLAN.md
 ```
 
 ## Requirements
 
-Python 3.10+ with key dependencies: `torch`, `transformers`, `sentence-transformers`, `xgboost`, `scikit-learn`, `pandas`, `numpy`, `matplotlib`, `seaborn`, `scipy`, `datasets`, `shap`. See `requirements.txt` for the full list with version pins.
+Python 3.10+ with `numpy`, `pandas`, `scikit-learn`, `scipy`, `matplotlib`,
+`torch`, `xgboost`, `sentence-transformers` (only needed to *rebuild* embeddings;
+the cached `data_icml/.../sbert.npy` is used by default). See `requirements.txt`.
