@@ -1,5 +1,5 @@
 project:
-  name: pstat262ds_multimodal_disagreement
+  name: pstat232_multimodal_disagreement
   seed: 42
   seeds: [42, 123, 456]  # multi-seed for robustness
 

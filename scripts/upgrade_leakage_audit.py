@@ -21,7 +21,7 @@ Outputs:
   reports/tables/metadata_correlations.csv
   reports/figures/metadata_feature_importance_no_leakage.png
   reports/leakage_audit.md
-  (also returns metadata-ablation rows reused by the ablation script)
+  (also returns metadata-ablation rows consumed by the ablation script)
 """
 
 import os

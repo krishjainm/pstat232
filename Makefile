@@ -1,5 +1,5 @@
 .PHONY: all install download preprocess disagreement train evaluate figures \
-        fusion disagree-aware extras paper clean test \
+        fusion disagree-aware extras clean test \
         pstat232 pstat232-main pstat232-calibration pstat232-inference \
         pstat232-tables pstat232-figures pstat232-report
 
@@ -63,7 +63,7 @@ test:
 
 # ----------------------------------------------------------------------------
 # PSTAT 232 (computational statistics) pipeline. Runs offline from the
-# materialized pools/embeddings in data_icml/ (no download/encoding needed).
+# materialized pools/embeddings in data_pool/ (no download/encoding needed).
 # ----------------------------------------------------------------------------
 pstat232: pstat232-tables pstat232-figures
 
@@ -83,9 +83,6 @@ pstat232-figures:
 
 pstat232-report:
 	cd paper && pdflatex -interaction=nonstopmode pstat232_report.tex && pdflatex -interaction=nonstopmode pstat232_report.tex
-
-paper:
-	cd paper && pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 
 clean:
 	rm -rf models/ data/interim/ data/processed/ data/raw/

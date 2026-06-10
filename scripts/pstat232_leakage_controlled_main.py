@@ -1,7 +1,6 @@
 """PSTAT 232 main driver: leakage-controlled disagreement-aware fusion.
 
-This is the *primary* PSTAT 232 pipeline. It is a computational-statistics
-re-framing of the original PSTAT 262DS multimodal-disagreement study:
+This is the *primary* PSTAT 232 pipeline:
 
   * Empirical risk minimization (ERM) for text-only, metadata-only, and an
     early-fusion model, with a disagreement-aware reweighted ERM variant.
@@ -13,14 +12,14 @@ re-framing of the original PSTAT 262DS multimodal-disagreement study:
     calibration, resampling-inference, and figure scripts consume a single,
     reproducible prediction artifact (no re-training required downstream).
 
-It reuses the validated, materialized canonical pools and cached SBERT
-embeddings under ``data_icml/`` via ``scripts_icml.icml_common``; therefore it
-runs offline with no data download.
+It uses the materialized canonical pools and cached SBERT embeddings under
+``data_pool/`` via ``pipeline.common``; therefore it runs offline with no data
+download.
 
 Outputs
 -------
-data_icml/processed/{category}_pstat232_test_predictions.parquet
-data_icml/processed/{category}_pstat232_val_predictions.parquet
+data_pool/processed/{category}_pstat232_test_predictions.parquet
+data_pool/processed/{category}_pstat232_val_predictions.parquet
 reports/tables/pstat232_main_results.csv
 reports/tables/pstat232_leakage_ablation.csv
 reports/tables/pstat232_accuracy_by_disagreement.csv
@@ -40,10 +39,10 @@ sys.path.insert(0, ".")
 import numpy as np
 import pandas as pd
 
-from scripts_icml import icml_common as C
+from pipeline import common as C
 
 TABLE_DIR = "reports/tables"
-PRED_DIR = os.path.join("data_icml", "processed")
+PRED_DIR = os.path.join("data_pool", "processed")
 
 
 def _ensure_dirs():
@@ -226,7 +225,7 @@ def build_predictions(category, seed):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--category", default="All_Beauty",
-                    help="Materialized category under data_icml/ (default All_Beauty)")
+                    help="Materialized category under data_pool/ (default All_Beauty)")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 

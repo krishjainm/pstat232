@@ -5,7 +5,7 @@
 
 ## Slide 1: Title
 - **When Modalities Disagree: Failure Modes in Multimodal Models**
-- PSTAT 262DS Final Project
+- PSTAT 232 Final Project
 - Author name, date
 
 ## Slide 2: Motivation

@@ -93,7 +93,7 @@ def download_category(category, max_raw=160000, seed=MASTER_SEED,
     For very large categories (multi-GB review files), reading the entire file
     is infeasible on modest hardware; we stop after `max_read_rows` rows and
     subsample from those. This introduces file-order bias for huge categories,
-    which is documented in the Phase-2 report.
+    which is documented as a limitation.
     """
     from huggingface_hub import hf_hub_download
 
@@ -160,7 +160,7 @@ def download_category(category, max_raw=160000, seed=MASTER_SEED,
 # Canonical pool: preprocess + balance + disagreement + SBERT cache
 # ---------------------------------------------------------------------------
 def _cfg_for_preprocess():
-    """Minimal cfg dict matching what the reused preprocess functions need."""
+    """Minimal cfg dict matching what the preprocess functions need."""
     return {
         "data": {"positive_threshold": 4, "negative_threshold": 2},
     }
@@ -508,7 +508,7 @@ def train_fusion(fusion_type, text_tr, meta_tr, y_tr, text_va, meta_va, y_va,
 
 
 # ---------------------------------------------------------------------------
-# Metric suite (Phase 1 requirements)
+# Conflict-aware metric suite
 # ---------------------------------------------------------------------------
 def _ece(y_true, y_prob, n_bins=10):
     from src.evaluation.calibration import expected_calibration_error
@@ -518,7 +518,7 @@ def _ece(y_true, y_prob, n_bins=10):
 
 def compute_metric_suite(test_df, pred, prob, text_pred=None, meta_pred=None,
                          high_conf=0.90):
-    """Compute the full Phase-1 conflict-aware metric dictionary for one model.
+    """Compute the full conflict-aware metric dictionary for one model.
 
     test_df must include: label, agreement_status, disagreement_group.
     prob is P(class=1); pred is the hard prediction.
@@ -676,12 +676,12 @@ def cohens_d(a, b):
 # ---------------------------------------------------------------------------
 # Experiment registry logger
 # ---------------------------------------------------------------------------
-REGISTRY_PATH = os.path.join("reports_icml", "experiment_registry.md")
+REGISTRY_PATH = os.path.join("reports", "experiment_registry.md")
 
 
 def log_experiment(row: dict):
     """Append a single experiment record to the registry markdown table."""
-    _ensure("reports_icml")
+    _ensure("reports")
     cols = ["timestamp", "phase", "dataset", "category", "seed", "split_id",
             "model", "features", "includes_product_avg_rating",
             "disagreement_labels_in_training", "command", "output_files",
@@ -694,9 +694,9 @@ def log_experiment(row: dict):
                              for c in cols) + " |"
     if not os.path.exists(REGISTRY_PATH):
         with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-            f.write("# Experiment Registry (ICML/NeurIPS upgrade)\n\n")
-            f.write("Every experiment run on the `icml-neurips-upgrade` branch is "
-                    "logged here automatically by `scripts_icml/icml_common.py`.\n\n")
+            f.write("# Experiment Registry\n\n")
+            f.write("Experiment records are logged here automatically by "
+                    "`pipeline/common.py`.\n\n")
             f.write(header + "\n" + sep + "\n")
     with open(REGISTRY_PATH, "a", encoding="utf-8") as f:
         f.write(line + "\n")

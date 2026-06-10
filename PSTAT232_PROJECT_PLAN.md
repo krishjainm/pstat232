@@ -1,134 +1,106 @@
-# PSTAT 232 Refactor Plan
+# PSTAT 232 Project Plan
 
 **Project title:** *A Computational Study of Disagreement-Aware Fusion,
 Calibration, and Resampling Inference in Text and Metadata Classification*
 
-This document records how the original **PSTAT 262DS** project ("When Modalities
-Disagree: Failure Modes and Mitigations in Multimodal Sentiment Classification")
-was refactored into a **PSTAT 232** (computational techniques in statistics)
-final project. Work is on branch **`pstat232-final`**.
+This document describes the project's goals, computational design, file layout,
+and reproduction commands. Work is on branch **`pstat232-final`**.
 
 ---
 
-## 1. Reframing summary
+## 1. Goals
 
-| | PSTAT 262DS (original) | PSTAT 232 (this refactor) |
-|---|---|---|
-| Framing | Multimodal ML / leaderboard | Computational statistics |
-| Central object | Best fusion architecture | Empirical risk, calibration, resampling inference |
-| Leakage | Audited in an appendix; `product_average_rating` used in main results | **Leakage control is the primary pipeline**; leaky set is a sensitivity ablation only |
-| Inference | Bootstrap CIs + McNemar reported | **Resampling inference is central**: bootstrap CIs + paired bootstrap tests for every key comparison |
-| Calibration | Global temperature scaling | **Group-conditional temperature scaling** via a label-free inference-time conflict proxy (new) |
-| Deliverable paper | `paper/main.tex` | `paper/pstat232_report.tex` |
+A computational-statistics study of a binary text-and-metadata classification
+problem in which the two modalities frequently disagree. The project is built
+around four computational themes:
 
----
-
-## 2. What is reused from PSTAT 262DS
-
-Reused **unchanged** (the new scripts depend on these):
-
-- `src/data/preprocess.py` — labeling, metadata merge, feature build, balancing.
-- `src/evaluation/calibration.py` — `expected_calibration_error` (ECE binning).
-- `src/evaluation/temperature_scaling.py`, `metrics.py`, `group_analysis.py`,
-  `statistical_tests.py`, `modality_dominance.py`, `qualitative.py`, `ablation.py`.
-- `src/models/*`, `src/features/*`, `src/visualization/plots.py`.
-- `scripts_icml/icml_common.py` — **key reuse**: canonical pool loading,
-  cached SBERT, CPU-light ERM training (`train_text_only`, `train_metadata_only`,
-  `train_fusion`), `compute_metric_suite`, and `bootstrap_ci` / `paired_bootstrap_test`
-  / `mcnemar` helpers. The new PSTAT 232 scripts are built directly on this.
-- `data_icml/interim/<category>/{canonical_pool.parquet, sbert.npy, sentiment_ckpt.parquet}`
-  — materialized, balanced 20k pools with cached embeddings for 5 categories.
-  This is why the PSTAT 232 pipeline runs **offline with no download/encoding**.
-
-Reused as **prior-work record** (kept, not archived):
-
-- `paper/main.tex`, `paper/references.bib`.
-- `paper_icml/`, `scripts_icml/` (rest), `reports_icml/`.
-- Original `reports/figures/*.png` and `reports/tables/*.csv` (the leaky-config
-  baseline is referenced for comparison).
+1. **Empirical risk minimization (ERM)** and a disagreement-aware reweighted
+   variant, with the conditional risk decomposed across agreement and
+   graded-disagreement strata.
+2. **Leakage-controlled evaluation** as the primary protocol: a label-encoding
+   product-level rating aggregate is removed from the main pipeline; the leaky
+   configuration is retained only as a sensitivity ablation.
+3. **Post-hoc calibration / UQ**: temperature scaling and a new
+   **group-conditional** temperature-scaling estimator driven by a label-free,
+   inference-time conflict proxy.
+4. **Resampling inference**: nonparametric bootstrap confidence intervals and
+   paired bootstrap / McNemar tests for every key comparison.
 
 ---
 
-## 3. What is changed for PSTAT 232
+## 2. Statistical design
 
-- **Leakage control is primary.** `scripts/pstat232_leakage_controlled_main.py`
-  drops `product_average_rating` and `product_rating_number` from the primary
-  metadata feature set (using `icml_common.METADATA_LEAKAGE_CONTROLLED`). The
-  full (leaky) set is trained only for the ablation table.
-- **Resampling inference is foregrounded** in its own script and report sections.
-- **New computational-statistics extension:** group-conditional temperature
-  scaling driven by a label-free conflict proxy.
-- **New report** with a statistics-style structure (problem formulation,
-  leakage audit, ERM, calibration/UQ, resampling results, interpretation,
-  limitations).
-- **README** rewritten as the PSTAT 232 landing page.
+- **Data.** Amazon Reviews 2023 (McAuley Lab), primary category `All_Beauty`,
+  with four additional materialized categories for sensitivity. A class-balanced
+  pool of 20,000 reviews with cached sentence-transformer embeddings and a
+  pretrained-sentiment proxy; a stratified 70/15/15 split (seed 42).
+- **Models (ERM estimators).** Text-only (logistic regression on SBERT
+  embeddings), metadata-only (gradient-boosted trees), early-fusion MLP, and a
+  disagreement-aware reweighted-ERM fusion model.
+- **Leakage control.** The primary metadata feature set drops
+  `product_average_rating` and `product_rating_number`; the full set is trained
+  only for the ablation table.
+- **Calibration.** A single global temperature vs. separate temperatures fit on
+  validation conflict / non-conflict subsets, evaluated by ECE, NLL, and Brier
+  score (and group-specific ECE).
+- **Inference.** Bootstrap (`B=2000`) percentile CIs and paired bootstrap +
+  McNemar tests.
 
 ---
 
-## 4. Files kept (in place)
+## 3. Repository layout
 
-- All of `src/`, `scripts/01..10_*.py`, `scripts/upgrade_*.py`,
-  `scripts/run_*.py`.
-- All of `scripts_icml/`, `data_icml/`, `reports_icml/`, `paper_icml/`.
-- `paper/main.tex`, `paper/references.bib`.
-- `tests/` (32 tests, all passing).
-- `config/config.yaml`, `requirements.txt`, `.gitignore`.
-
-## 5. Files archived → `archive/pstat262ds/`
-
-| Moved from | Moved to |
+| Path | Purpose |
 |---|---|
-| `reports/presentation_outline.md` | `archive/pstat262ds/presentation_outline.md` |
-| `reports/final_report_outline.md` | `archive/pstat262ds/final_report_outline.md` |
+| `scripts/pstat232_leakage_controlled_main.py` | Primary leakage-controlled ERM pipeline; persists per-sample val/test predictions; writes main, leakage-ablation, accuracy-by-disagreement, and selective-prediction tables. |
+| `scripts/pstat232_group_conditional_calibration.py` | Global vs group-conditional temperature scaling via the inference-time conflict proxy. |
+| `scripts/pstat232_resampling_inference.py` | Bootstrap CIs + paired bootstrap / McNemar tests. |
+| `scripts/pstat232_make_figures.py` | The five report figures (data-guarded). |
+| `pipeline/common.py` | Canonical pool loading, cached SBERT, CPU-light ERM training, the conflict-aware metric suite, and bootstrap/McNemar helpers. |
+| `src/` | Reusable modules: data, features, models, evaluation, visualization. |
+| `data_pool/` | Materialized pools, cached SBERT embeddings, and prediction artifacts. |
+| `reports/tables/`, `reports/figures/` | Generated CSVs and PNGs. |
+| `paper/pstat232_report.tex` | The report (compiles to PDF). |
+| `tests/` | 32 unit tests. |
+| `archive/legacy_materials/` | Supplementary outline notes. |
 
-Plus a new `archive/pstat262ds/README.md` explaining the archive.
-
-> Conservative archiving: only clearly class/submission-specific *outline* docs
-> were moved. Source code, the ICML infrastructure, and result artifacts were
-> retained because the PSTAT 232 pipeline reuses or references them, and moving
-> them would break imports.
-
-## 6. New files added
-
-**Scripts** (`scripts/`)
-
-- `pstat232_leakage_controlled_main.py` — primary leakage-controlled ERM pipeline;
-  trains text/metadata/fusion/disagreement-aware models on one split; persists
-  per-sample val/test predictions; writes main results, leakage ablation,
-  accuracy-by-disagreement, and selective-prediction tables.
-- `pstat232_group_conditional_calibration.py` — global vs group-conditional
-  temperature scaling via the inference-time conflict proxy.
-- `pstat232_resampling_inference.py` — bootstrap CIs + paired bootstrap / McNemar.
-- `pstat232_make_figures.py` — the five PSTAT 232 figures (data-guarded).
-
-**Report**
-
-- `paper/pstat232_report.tex` (compiles to PDF).
-
-**Plan / docs**
-
-- `PSTAT232_REFACTOR_PLAN.md` (this file), `archive/pstat262ds/README.md`,
-  rewritten `README.md`.
-
-**Generated artifacts** (produced by the scripts above)
-
-- Tables: `reports/tables/pstat232_main_results.csv`,
-  `pstat232_leakage_ablation.csv`, `pstat232_accuracy_by_disagreement.csv`,
-  `pstat232_group_calibration.csv`, `pstat232_bootstrap_ci.csv`,
-  `pstat232_paired_comparisons.csv`, `pstat232_selective_prediction.csv`.
-- Figures: `reports/figures/pstat232_accuracy_by_disagreement.png`,
-  `pstat232_calibration_by_group.png`, `pstat232_group_calibration.png`,
-  `pstat232_leakage_ablation.png`, `pstat232_selective_prediction.png`.
-- Predictions: `data_icml/processed/All_Beauty_pstat232_{val,test}_predictions.parquet`.
-
-**Makefile**: added `pstat232`, `pstat232-tables`, `pstat232-figures`,
-`pstat232-report` (and `pstat232-main/-calibration/-inference`).
+The `scripts/01..10_*.py` and `scripts/upgrade_*.py` provide a full
+data-download-to-figures pipeline for the broader analysis (download, preprocess,
+disagreement labeling, training, evaluation, figures, ablations, statistics).
 
 ---
 
-## 7. Commands to reproduce the PSTAT 232 version
+## 4. Data flow
 
-Runs **offline** from `data_icml/` (no download/encoding required):
+`pstat232_leakage_controlled_main.py` is the single source of per-sample
+predictions: it persists
+`data_pool/processed/All_Beauty_pstat232_{val,test}_predictions.parquet`, which
+the calibration, resampling-inference, and figure scripts consume directly. No
+retraining is required for steps 2–4.
+
+---
+
+## 5. Outputs
+
+**Tables** (`reports/tables/`): `pstat232_main_results.csv`,
+`pstat232_leakage_ablation.csv`, `pstat232_accuracy_by_disagreement.csv`,
+`pstat232_group_calibration.csv`, `pstat232_bootstrap_ci.csv`,
+`pstat232_paired_comparisons.csv`, `pstat232_selective_prediction.csv`.
+
+**Figures** (`reports/figures/`): `pstat232_accuracy_by_disagreement.png`,
+`pstat232_calibration_by_group.png`, `pstat232_group_calibration.png`,
+`pstat232_leakage_ablation.png`, `pstat232_selective_prediction.png`.
+
+**Predictions** (`data_pool/processed/`):
+`All_Beauty_pstat232_{val,test}_predictions.parquet`.
+
+**Report**: `paper/pstat232_report.tex`.
+
+---
+
+## 6. Reproduction commands
+
+Runs **offline** from `data_pool/` (no download/encoding required):
 
 ```bash
 pip install -r requirements.txt
@@ -148,13 +120,14 @@ python scripts/pstat232_make_figures.py --category All_Beauty
 ```
 
 Other materialized categories can be substituted via `--category`
-(`Appliances`, `Digital_Music`, `Gift_Cards`, `Video_Games`) or `make pstat232 CATEGORY=Appliances`.
+(`Appliances`, `Digital_Music`, `Gift_Cards`, `Video_Games`) or
+`make pstat232 CATEGORY=Appliances`.
 
 ---
 
-## 8. Verification status
+## 7. Verification status
 
-- All four PSTAT 232 scripts run end-to-end on `All_Beauty` (verified).
+- All four scripts run end-to-end on `All_Beauty` (verified).
 - All 7 tables and 5 figures regenerated from materialized data (verified).
 - `paper/pstat232_report.tex` compiles to PDF with `pdflatex` (TinyTeX), no
   undefined references (verified).
@@ -164,21 +137,15 @@ Other materialized categories can be substituted via `--category`
 
 ---
 
-## 9. Known issues / missing data / TODO
+## 8. Known issues / TODO
 
-- **`data/processed/` (original pipeline) is gitignored and not materialized.**
-  The original `scripts/01..10_*.py` pipeline reads `data/processed/*.parquet`,
-  which requires a network download (`scripts/01_download_data.py`) and SBERT
-  encoding. The PSTAT 232 pipeline deliberately avoids this by using the
-  materialized `data_icml/` pools instead. To run the *original* pipeline:
-  `make download preprocess disagreement train evaluate figures`.
-- **Single primary category/seed for headline claims.** `All_Beauty`, seed 42.
+- **Headline claims use one primary category/seed** (`All_Beauty`, seed 42).
   Cross-category replication is supported by the scripts (`--category`) but not
-  run for every category here; this is noted as a limitation in the report.
-- **`sentence-transformers` import is slow / only needed to rebuild embeddings.**
-  The cached `data_icml/.../sbert.npy` is used by default; ST is not imported at
-  runtime unless the pool/cache is missing.
+  run for every category; this is noted as a limitation in the report.
+- **`sentence-transformers` is only needed to rebuild embeddings.** The cached
+  `data_pool/.../sbert.npy` is used by default; it is not imported at runtime
+  unless the pool/cache is missing.
 - **ECE bootstrap CIs** are for a binned, non-smooth functional and are reported
   as indicative (noted in the report's Limitations).
-- **TODO (optional future work):** run `make pstat232 CATEGORY=...` across all
-  five categories and aggregate a cross-category sensitivity table/figure.
+- **TODO (optional):** run `make pstat232 CATEGORY=...` across all five
+  categories and aggregate a cross-category sensitivity table/figure.

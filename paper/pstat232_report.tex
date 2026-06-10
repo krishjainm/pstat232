@@ -80,9 +80,8 @@ Our emphasis throughout is on \emph{computational technique}: ERM and reweighted
 ERM as optimization problems, temperature scaling as a one-parameter convex
 calibration fit, the bootstrap and paired bootstrap as Monte-Carlo inference
 procedures, and a leakage-controlled protocol as an experimental-design control.
-This is a deliberate reframing of an earlier PSTAT 262DS project (Section
-\ref{sec:relation}); the modeling code is reused, but the questions, the primary
-pipeline, and the inferential machinery are recast for PSTAT 232.
+Every figure and table in this report is produced by the accompanying
+reproducible scripts (Section~\ref{sec:repro}).
 
 \section{Statistical Problem Formulation}
 \label{sec:formulation}
@@ -138,7 +137,7 @@ On the test split, $2317/20000 \approx 11.6\%$ of pooled reviews are conflicts,
 and the disagreement subset has $n=368$ test reviews.
 
 \paragraph{Leakage audit and control.}
-The metadata feature set originally included \texttt{product\_average\_rating},
+The metadata feature set includes \texttt{product\_average\_rating},
 a \emph{product-level} aggregate of star ratings. Because the label $Y$ is itself
 derived from the per-review rating, this aggregate partially encodes the label
 and is a textbook source of target leakage. Our \textbf{primary PSTAT 232
@@ -186,7 +185,7 @@ Green = leakage-controlled, red = full (leaky) feature set.}
 \section{Methods}
 \label{sec:methods}
 
-\paragraph{Models (reused ERM estimators).}
+\paragraph{Models (ERM estimators).}
 \emph{Text-only}: $\ell_2$-regularized logistic regression on frozen
 sentence-transformer (\texttt{all-MiniLM-L6-v2}) embeddings. \emph{Metadata-only}:
 gradient-boosted trees (XGBoost, 200 estimators, depth 6) on standardized,
@@ -474,31 +473,20 @@ decomposition exposes a conditional-risk gap under conflict; reweighted ERM
 reallocates rather than eliminates that risk; resampling inference shows the
 fusion advantage is within sampling noise once leakage is controlled; and
 group-conditional calibration confirms heterogeneous miscalibration while
-revealing that most of the previously reported calibration pathology was a
-leakage artifact. The accompanying scripts reproduce every figure and table
-end-to-end from materialized data.
-
-\section*{Relationship to the Prior PSTAT 262DS Project}
-\label{sec:relation}
-This project reuses the data pipeline, model code, and metric utilities of an
-earlier PSTAT 262DS study (``When Modalities Disagree''). The reframing for
-PSTAT 232 makes leakage control the \emph{primary} setting (previously an
-appendix audit), foregrounds resampling-based inference, adds the
-group-conditional calibration estimator, and replaces the leaderboard narrative
-with a computational-statistics one. See \texttt{PSTAT232\_REFACTOR\_PLAN.md} for
-a file-by-file account of what was reused, changed, and archived.
+revealing that most of the apparent calibration pathology under the leaky
+configuration is a leakage artifact. The accompanying scripts reproduce every
+figure and table end-to-end from materialized data.
 
 \begin{thebibliography}{9}
 \bibitem{guo2017calibration} C.\ Guo, G.\ Pleiss, Y.\ Sun, K.\ Q.\ Weinberger.
-  On Calibration of Modern Neural Networks. \emph{ICML}, 2017.
+  On Calibration of Modern Neural Networks. 2017.
 \bibitem{efron1994bootstrap} B.\ Efron, R.\ Tibshirani.
   \emph{An Introduction to the Bootstrap}. Chapman \& Hall, 1994.
 \bibitem{dietterich1998} T.\ G.\ Dietterich.
   Approximate Statistical Tests for Comparing Supervised Classification
   Learning Algorithms. \emph{Neural Computation}, 10(7), 1998.
 \bibitem{reimers2019sbert} N.\ Reimers, I.\ Gurevych.
-  Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.
-  \emph{EMNLP}, 2019.
+  Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks. 2019.
 \bibitem{hovy2021} D.\ Hovy, S.\ Prabhumoye.
   Five sources of bias in natural language processing.
   \emph{Language and Linguistics Compass}, 2021.

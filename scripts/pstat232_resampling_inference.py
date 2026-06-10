@@ -13,7 +13,7 @@ McNemar's test.
    alongside for the accuracy comparison.
 
 Inputs (produced by scripts/pstat232_leakage_controlled_main.py)
-    data_icml/processed/{category}_pstat232_test_predictions.parquet
+    data_pool/processed/{category}_pstat232_test_predictions.parquet
 
 Outputs
     reports/tables/pstat232_bootstrap_ci.csv
@@ -32,10 +32,10 @@ sys.path.insert(0, ".")
 import numpy as np
 import pandas as pd
 
-from scripts_icml import icml_common as C
+from pipeline import common as C
 
 TABLE_DIR = "reports/tables"
-PRED_DIR = os.path.join("data_icml", "processed")
+PRED_DIR = os.path.join("data_pool", "processed")
 
 MODELS = [
     ("text_only", "text_pred", "text_prob"),

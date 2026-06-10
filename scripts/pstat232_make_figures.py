@@ -16,7 +16,7 @@ Inputs
     reports/tables/pstat232_leakage_ablation.csv
     reports/tables/pstat232_selective_prediction.csv
     reports/tables/pstat232_group_calibration.csv
-    data_icml/processed/{category}_pstat232_test_predictions.parquet
+    data_pool/processed/{category}_pstat232_test_predictions.parquet
 
 Usage
     python scripts/pstat232_make_figures.py --category All_Beauty
@@ -39,7 +39,7 @@ from src.evaluation.calibration import expected_calibration_error
 
 TABLE_DIR = "reports/tables"
 FIG_DIR = "reports/figures"
-PRED_DIR = os.path.join("data_icml", "processed")
+PRED_DIR = os.path.join("data_pool", "processed")
 
 MODEL_LABELS = {
     "text_only": "Text-only",

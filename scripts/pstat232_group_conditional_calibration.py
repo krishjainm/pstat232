@@ -28,8 +28,8 @@ The model being calibrated is the leakage-controlled early-fusion model
 there is no test-set leakage in the calibration step.
 
 Inputs (produced by scripts/pstat232_leakage_controlled_main.py)
-    data_icml/processed/{category}_pstat232_val_predictions.parquet
-    data_icml/processed/{category}_pstat232_test_predictions.parquet
+    data_pool/processed/{category}_pstat232_val_predictions.parquet
+    data_pool/processed/{category}_pstat232_test_predictions.parquet
 
 Outputs
     reports/tables/pstat232_group_calibration.csv
@@ -53,7 +53,7 @@ from src.evaluation.calibration import expected_calibration_error
 
 TABLE_DIR = "reports/tables"
 FIG_DIR = "reports/figures"
-PRED_DIR = os.path.join("data_icml", "processed")
+PRED_DIR = os.path.join("data_pool", "processed")
 
 
 def _paths(category):
